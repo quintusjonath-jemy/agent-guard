@@ -100,6 +100,7 @@ export interface Execution {
   risk_score: number;
   risk_level: RiskLevel;
   reason?: string;
+  plain_english_explanation?: string;
   pipeline_breakdown?: ExecutionPipelineStep[];
   execution_status: string;
   response_payload?: Record<string, any>;
@@ -181,6 +182,41 @@ export interface APIKey {
   expires_at?: string;
 }
 
+export interface AgentPermission {
+  id: number;
+  agent_id: number;
+  permission_name: string;
+  is_allowed: boolean;
+  max_amount?: number;
+  rate_limit?: number;
+}
+
+export interface AgentDetailResponse extends Agent {
+  tools?: Tool[];
+  permissions?: AgentPermission[];
+  policies?: Policy[];
+  recent_blocked_count?: number;
+  recent_incidents_count?: number;
+}
+
+export type ApprovalResponse = Approval;
+export type ExecutionDetailResponse = Execution;
+export type ExecutionListItem = Execution;
+
+export interface SecurityTestReportResponse {
+  total_tests: number;
+  passed_tests: number;
+  failed_tests: number;
+  score: number;
+  risk_distribution: Record<string, number>;
+  scenarios?: SecurityTest[];
+  results?: SecurityTest[];
+  agent_name?: string;
+  critical_findings?: number;
+  high_risk_findings?: number;
+}
+
+
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;
@@ -190,3 +226,4 @@ export interface ApiResponse<T> {
     message: string;
   };
 }
+
