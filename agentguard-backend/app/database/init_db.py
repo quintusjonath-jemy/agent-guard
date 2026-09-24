@@ -249,3 +249,10 @@ def init_db(db: Session = None):
     finally:
         if should_close:
             db.close()
+
+
+if __name__ == "__main__":
+    print("Initializing AgentGuard database tables and seeding initial records...")
+    init_db()
+    print("Database tables and seed data created successfully!")
+
