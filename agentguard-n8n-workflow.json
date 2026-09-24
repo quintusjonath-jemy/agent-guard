@@ -1,0 +1,154 @@
+{
+  "name": "AgentGuard Protected Autonomous Agent Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-webhook",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Incoming Agent Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "http://backend:8000/api/v1/execute",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "ag_live_demo_key_secret_hash"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "agent_id",
+              "value": "={{ $json.body.agent_id || 1 }}"
+            },
+            {
+              "name": "tool_name",
+              "value": "={{ $json.body.tool_name }}"
+            },
+            {
+              "name": "action_name",
+              "value": "={{ $json.body.action_name }}"
+            },
+            {
+              "name": "request_payload",
+              "value": "={{ $json.body.payload }}"
+            }
+          ]
+        }
+      },
+      "id": "2",
+      "name": "AgentGuard Security Firewall",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.decision }}",
+              "value2": "ALLOWED"
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Evaluate Guard Decision",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, decision: $json.decision, tool_response: $json.tool_response, execution_id: $json.execution_id } }}"
+      },
+      "id": "4",
+      "name": "Proceed With Action Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, decision: $json.decision, risk_score: $json.risk_score, reason: $json.reason, details: $json.plain_english_explanation } }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "5",
+      "name": "Block Unsafe Agent Action",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 420]
+    }
+  ],
+  "connections": {
+    "Incoming Agent Request": {
+      "main": [
+        [
+          {
+            "node": "AgentGuard Security Firewall",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AgentGuard Security Firewall": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Guard Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Guard Decision": {
+      "main": [
+        [
+          {
+            "node": "Proceed With Action Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Block Unsafe Agent Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
