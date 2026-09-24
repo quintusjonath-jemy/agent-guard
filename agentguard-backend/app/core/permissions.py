@@ -1,0 +1,67 @@
+from enum import Enum
+
+class UserRole(str, Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ADMIN = "ADMIN"
+    SECURITY_ANALYST = "SECURITY_ANALYST"
+    VIEWER = "VIEWER"
+
+class UserStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    SUSPENDED = "SUSPENDED"
+
+class AgentStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    PAUSED = "PAUSED"
+    DISABLED = "DISABLED"
+
+class RiskLevel(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+class ExecutionDecision(str, Enum):
+    ALLOWED = "ALLOWED"
+    BLOCKED = "BLOCKED"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    FAILED = "FAILED"
+
+class ApprovalStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    EXPIRED = "EXPIRED"
+
+class IncidentStatus(str, Enum):
+    OPEN = "OPEN"
+    INVESTIGATING = "INVESTIGATING"
+    CONTAINED = "CONTAINED"
+    RESOLVED = "RESOLVED"
+
+class IncidentSeverity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+class PolicyType(str, Enum):
+    FINANCIAL_LIMIT = "FINANCIAL_LIMIT"
+    DATA_ACCESS = "DATA_ACCESS"
+    EXTERNAL_COMMUNICATION = "EXTERNAL_COMMUNICATION"
+    DELETE_OPERATION = "DELETE_OPERATION"
+    RATE_LIMIT = "RATE_LIMIT"
+    APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
+    SENSITIVE_DATA = "SENSITIVE_DATA"
+    TOOL_RESTRICTION = "TOOL_RESTRICTION"
+
+class PermissionType(str, Enum):
+    READ = "READ"
+    WRITE = "WRITE"
+    DELETE = "DELETE"
+    FINANCIAL = "FINANCIAL"
+    EXTERNAL_COMMUNICATION = "EXTERNAL_COMMUNICATION"
+    SENSITIVE_DATA = "SENSITIVE_DATA"
+    DATABASE_EXPORT = "DATABASE_EXPORT"
+    FILE_MODIFICATION = "FILE_MODIFICATION"

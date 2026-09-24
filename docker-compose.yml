@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: agentguard-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: agentguard_db
+      MYSQL_USER: agentguard_user
+      MYSQL_PASSWORD: agentguard_secure_password
+      MYSQL_ROOT_PASSWORD: root_secure_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - agentguard-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentguard-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentguard-network
+
+  backend:
+    build:
+      context: ./agentguard-backend
+      dockerfile: Dockerfile
+    container_name: agentguard-backend
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=mysql+pymysql://agentguard_user:agentguard_secure_password@mysql:3306/agentguard_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=super-secret-agentguard-jwt-key-change-in-production-min-32-chars-long
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agentguard-network
+
+  worker:
+    build:
+      context: ./agentguard-backend
+      dockerfile: Dockerfile
+    container_name: agentguard-worker
+    restart: unless-stopped
+    command: celery -A app.workers.tasks.celery_app worker --loglevel=info
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=mysql+pymysql://agentguard_user:agentguard_secure_password@mysql:3306/agentguard_db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=super-secret-agentguard-jwt-key-change-in-production-min-32-chars-long
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agentguard-network
+
+  frontend:
+    build:
+      context: ./agentguard-frontend
+      dockerfile: Dockerfile
+    container_name: agentguard-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - agentguard-network
+
+networks:
+  agentguard-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:

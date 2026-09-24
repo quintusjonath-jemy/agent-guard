@@ -1,0 +1,111 @@
+# ==============================================================================
+# SENSITIVE DATA & CREDENTIALS (NEVER COMMIT)
+# ==============================================================================
+# Environment variable files containing secrets/passwords/API keys
+.env
+.env.*
+!.env.example
+*.env
+
+# Certificates, Keys, Private tokens
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+*.token
+credentials.json
+secrets/
+
+# Databases & local storage files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+agentguard.db
+mysql_data/
+redis_data/
+
+# ==============================================================================
+# PYTHON & VIRTUAL ENVIRONMENTS
+# ==============================================================================
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Celery & background scheduler
+celerybeat-schedule
+celerybeat.pid
+
+# ==============================================================================
+# NODE & JAVASCRIPT / TYPESCRIPT
+# ==============================================================================
+node_modules/
+agentguard-frontend/node_modules/
+agentguard-frontend/dist/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+
+# ==============================================================================
+# LOGS & TEMPORARY FILES
+# ==============================================================================
+logs/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ==============================================================================
+# OPERATING SYSTEM & IDEs
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

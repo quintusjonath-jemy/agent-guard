@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-950 text-slate-100 font-sans min-h-screen;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(6, 182, 212, 0.04) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.04) 0px, transparent 50%),
+      linear-gradient(to right, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  }
+}
+
+/* Glassmorphic card styling */
+.glass-panel {
+  @apply bg-dark-900/80 backdrop-blur-md border border-slate-800/80 rounded-xl transition-all duration-200;
+}
+
+.glass-panel-elevated {
+  @apply bg-dark-850/90 backdrop-blur-lg border border-slate-700/60 rounded-xl shadow-xl transition-all duration-200;
+}
+
+.glass-panel-interactive {
+  @apply bg-dark-900/70 backdrop-blur-md border border-slate-800/80 rounded-xl hover:border-slate-700 hover:bg-dark-850/80 transition-all duration-200;
+}
+
+/* Code & Log Box Styling */
+.code-box {
+  @apply font-mono bg-dark-950/90 border border-slate-800/90 text-slate-300 rounded-lg p-3 text-xs leading-relaxed;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 13, 20, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(51, 65, 85, 0.6);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.9);
+}
