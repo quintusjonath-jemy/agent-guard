@@ -1,61 +1,85 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Shield, Lock, Activity, Bot, Cpu, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AppShell } from './layouts/AppShell';
+
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { Dashboard } from './pages/Dashboard';
+import { LiveMonitor } from './pages/LiveMonitor';
+import { Agents } from './pages/Agents';
+import { AgentDetail } from './pages/AgentDetail';
+import { Tools } from './pages/Tools';
+import { Policies } from './pages/Policies';
+import { Executions } from './pages/Executions';
+import { ExecutionInspector } from './pages/ExecutionInspector';
+import { Approvals } from './pages/Approvals';
+import { SecurityTestLab } from './pages/SecurityTestLab';
+import { Incidents } from './pages/Incidents';
+import { AuditLogs } from './pages/AuditLogs';
+import { Integrations } from './pages/Integrations';
+import { ApiKeys } from './pages/ApiKeys';
+import { Settings } from './pages/Settings';
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center text-cyan-400 font-mono text-sm">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>INITIALIZING AGENTGUARD...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-dark-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center">
-      <div className="max-w-2xl w-full glass-panel-elevated p-10 border border-cyan-500/20 shadow-glow-teal">
-        <div className="inline-flex p-4 rounded-2xl bg-cyan-950/50 border border-cyan-500/30 text-cyan-400 mb-6 animate-pulse-subtle">
-          <Shield className="w-12 h-12" />
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl text-white mb-2">
-          Agent<span className="text-cyan-400">Guard</span>
-        </h1>
-        <p className="text-sm uppercase tracking-widest text-cyan-400/80 font-mono mb-4">
-          The Security Firewall for AI Agents
-        </p>
-        <p className="text-slate-400 text-sm leading-relaxed mb-8 max-w-lg mx-auto">
-          AI decides what it wants to do. <br className="hidden sm:inline" />
-          AgentGuard decides whether it is allowed to do it.
-        </p>
+    <AuthProvider>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-left mb-8">
-          <div className="bg-dark-950/80 border border-slate-800 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mb-1">
-              <Bot className="w-3.5 h-3.5 text-cyan-400" />
-              AGENTS
-            </div>
-            <div className="text-lg font-bold text-white">4 Active</div>
-          </div>
-          <div className="bg-dark-950/80 border border-slate-800 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mb-1">
-              <Lock className="w-3.5 h-3.5 text-emerald-400" />
-              POLICIES
-            </div>
-            <div className="text-lg font-bold text-white">5 Enforced</div>
-          </div>
-          <div className="bg-dark-950/80 border border-slate-800 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mb-1">
-              <Activity className="w-3.5 h-3.5 text-blue-400" />
-              GATEWAY
-            </div>
-            <div className="text-lg font-bold text-white font-mono text-emerald-400">ONLINE</div>
-          </div>
-          <div className="bg-dark-950/80 border border-slate-800 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mb-1">
-              <Cpu className="w-3.5 h-3.5 text-amber-400" />
-              RISK SCORE
-            </div>
-            <div className="text-lg font-bold text-white">96 / 100</div>
-          </div>
-        </div>
+        {/* Protected App Routes */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="live-monitor" element={<LiveMonitor />} />
+          <Route path="executions" element={<Executions />} />
+          <Route path="executions/:id" element={<ExecutionInspector />} />
+          <Route path="agents" element={<Agents />} />
+          <Route path="agents/:id" element={<AgentDetail />} />
+          <Route path="tools" element={<Tools />} />
+          <Route path="policies" element={<Policies />} />
+          <Route path="approvals" element={<Approvals />} />
+          <Route path="security-tests" element={<SecurityTestLab />} />
+          <Route path="incidents" element={<Incidents />} />
+          <Route path="audit-logs" element={<AuditLogs />} />
+          <Route path="integrations" element={<Integrations />} />
+          <Route path="api-keys" element={<ApiKeys />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          Phase 1 Complete — Architecture & Database Ready
-        </div>
-      </div>
-    </div>
+        {/* Catch-all Fallback */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AuthProvider>
   );
 }
