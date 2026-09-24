@@ -7,6 +7,9 @@ from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.database.init_db import init_db
 from app.schemas.common import HealthCheckResponse, ApiResponse
+from app.api.auth import router as auth_router
+from app.api.users import router as users_router
+from app.api.api_keys import router as api_keys_router
 
 # Initialize logging
 setup_logging()
@@ -55,6 +58,11 @@ async def global_exception_handler(request: Request, exc: Exception):
             }
         }
     )
+
+# Include API Routers under API_PREFIX
+app.include_router(auth_router, prefix=settings.API_PREFIX)
+app.include_router(users_router, prefix=settings.API_PREFIX)
+app.include_router(api_keys_router, prefix=settings.API_PREFIX)
 
 # Base Health Check Route
 @app.get("/health", response_model=ApiResponse[HealthCheckResponse], tags=["System"])
