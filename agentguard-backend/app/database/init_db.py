@@ -12,7 +12,6 @@ from app.models.policy import Policy
 from app.core.logging import logger
 
 def init_db(db: Session = None):
-    # Ensure all tables exist
     Base.metadata.create_all(bind=engine)
     
     if db is None:
@@ -22,7 +21,7 @@ def init_db(db: Session = None):
         should_close = False
         
     try:
-        # 1. Create Default Permissions if not present
+        # 1. Permissions
         permission_defs = [
             (PermissionType.READ, "Read-only access to entity records"),
             (PermissionType.WRITE, "Ability to create or update entity records"),
@@ -43,7 +42,7 @@ def init_db(db: Session = None):
                 db.flush()
             perm_map[p_name] = perm
             
-        # 2. Create Default Admin & Analyst Users
+        # 2. Users
         admin_user = db.query(User).filter(User.email == "admin@agentguard.io").first()
         if not admin_user:
             admin_user = User(
@@ -55,7 +54,6 @@ def init_db(db: Session = None):
             )
             db.add(admin_user)
             db.flush()
-            logger.info("Created default SUPER_ADMIN user: admin@agentguard.io / Admin123!")
 
         analyst_user = db.query(User).filter(User.email == "analyst@agentguard.io").first()
         if not analyst_user:
@@ -69,12 +67,13 @@ def init_db(db: Session = None):
             db.add(analyst_user)
             db.flush()
 
-        # 3. Create Default Tools
+        # 3. Tools
+        # Note: refund_customer requires approval dynamically through policy when exceeding limits
         tool_defs = [
             ("customer.read", "Retrieve customer profile and contact details", "API", "/tools/customer/read", RiskLevel.LOW, PermissionType.READ, False),
             ("ticket.create", "Create customer support tickets or update status", "API", "/tools/ticket/create", RiskLevel.LOW, PermissionType.WRITE, False),
             ("email.send", "Send external notification or support emails", "COMMUNICATION", "/tools/email/send", RiskLevel.MEDIUM, PermissionType.EXTERNAL_COMMUNICATION, False),
-            ("refund_customer", "Process financial refund transaction to customer account", "FINANCIAL", "/tools/finance/refund", RiskLevel.HIGH, PermissionType.FINANCIAL, True),
+            ("refund_customer", "Process financial refund transaction to customer account", "FINANCIAL", "/tools/finance/refund", RiskLevel.HIGH, PermissionType.FINANCIAL, False),
             ("customer.delete", "Permanently delete customer record and all GDPR history", "DATABASE", "/tools/customer/delete", RiskLevel.CRITICAL, PermissionType.DELETE, True),
             ("database.export", "Export entire customer database or transaction records", "DATABASE", "/tools/database/export", RiskLevel.CRITICAL, PermissionType.DATABASE_EXPORT, True),
             ("notification.send", "Send internal IT notification alerts", "COMMUNICATION", "/tools/notification/send", RiskLevel.LOW, PermissionType.EXTERNAL_COMMUNICATION, False),
@@ -99,10 +98,11 @@ def init_db(db: Session = None):
                 )
                 db.add(tool)
                 db.flush()
+            else:
+                tool.requires_approval = req_app
             tool_map[name] = tool
 
-        # 4. Create Demo Agents
-        # Agent 1: FinanceBot
+        # 4. Demo Agents
         finance_bot = db.query(Agent).filter(Agent.name == "FinanceBot").first()
         if not finance_bot:
             finance_bot = Agent(
@@ -118,15 +118,12 @@ def init_db(db: Session = None):
             db.add(finance_bot)
             db.flush()
             
-            # Tools: customer.read, refund_customer
             db.add(AgentTool(agent_id=finance_bot.id, tool_id=tool_map["customer.read"].id, permission_level="READ"))
             db.add(AgentTool(agent_id=finance_bot.id, tool_id=tool_map["refund_customer"].id, permission_level="FINANCIAL"))
             
-            # Permissions: READ, FINANCIAL (max_amount: 10000.0)
             db.add(AgentPermission(agent_id=finance_bot.id, permission_id=perm_map[PermissionType.READ].id))
             db.add(AgentPermission(agent_id=finance_bot.id, permission_id=perm_map[PermissionType.FINANCIAL].id, max_amount=10000.0))
 
-        # Agent 2: SupportBot (Customer Support Agent)
         support_bot = db.query(Agent).filter(Agent.name == "SupportBot").first()
         if not support_bot:
             support_bot = Agent(
@@ -142,17 +139,14 @@ def init_db(db: Session = None):
             db.add(support_bot)
             db.flush()
             
-            # Tools: customer.read, ticket.create, email.send
             db.add(AgentTool(agent_id=support_bot.id, tool_id=tool_map["customer.read"].id))
             db.add(AgentTool(agent_id=support_bot.id, tool_id=tool_map["ticket.create"].id))
             db.add(AgentTool(agent_id=support_bot.id, tool_id=tool_map["email.send"].id))
             
-            # Permissions: READ, WRITE, EXTERNAL_COMMUNICATION
             db.add(AgentPermission(agent_id=support_bot.id, permission_id=perm_map[PermissionType.READ].id))
             db.add(AgentPermission(agent_id=support_bot.id, permission_id=perm_map[PermissionType.WRITE].id))
             db.add(AgentPermission(agent_id=support_bot.id, permission_id=perm_map[PermissionType.EXTERNAL_COMMUNICATION].id))
 
-        # Agent 3: HR Assistant
         hr_bot = db.query(Agent).filter(Agent.name == "HR Assistant").first()
         if not hr_bot:
             hr_bot = Agent(
@@ -168,12 +162,9 @@ def init_db(db: Session = None):
             db.add(hr_bot)
             db.flush()
             
-            # Tools: employee.read
             db.add(AgentTool(agent_id=hr_bot.id, tool_id=tool_map["employee.read"].id))
-            # Permissions: READ
             db.add(AgentPermission(agent_id=hr_bot.id, permission_id=perm_map[PermissionType.READ].id))
 
-        # Agent 4: IT Support Agent
         it_bot = db.query(Agent).filter(Agent.name == "IT Support Agent").first()
         if not it_bot:
             it_bot = Agent(
@@ -189,23 +180,21 @@ def init_db(db: Session = None):
             db.add(it_bot)
             db.flush()
             
-            # Tools: ticket.create, device.read, notification.send
             db.add(AgentTool(agent_id=it_bot.id, tool_id=tool_map["ticket.create"].id))
             db.add(AgentTool(agent_id=it_bot.id, tool_id=tool_map["device.read"].id))
             db.add(AgentTool(agent_id=it_bot.id, tool_id=tool_map["notification.send"].id))
             
-            # Permissions: READ, WRITE, EXTERNAL_COMMUNICATION
             db.add(AgentPermission(agent_id=it_bot.id, permission_id=perm_map[PermissionType.READ].id))
             db.add(AgentPermission(agent_id=it_bot.id, permission_id=perm_map[PermissionType.WRITE].id))
             db.add(AgentPermission(agent_id=it_bot.id, permission_id=perm_map[PermissionType.EXTERNAL_COMMUNICATION].id))
 
-        # 5. Create Core Policies
+        # 5. Core Policies
         policy_defs = [
             (
                 "Financial Limit Policy - Max ₹10,000",
                 "Requires human approval and blocks any refund exceeding ₹10,000 without authorized override",
                 PolicyType.FINANCIAL_LIMIT,
-                {"action": "refund_customer", "field": "amount", "operator": "gt", "value": 10000.0, "enforce": "BLOCK_OR_REQUIRE_APPROVAL"},
+                {"action": "refund_customer", "field": "amount", "operator": "gt", "value": 10000.0, "enforce": "REQUIRE_APPROVAL"},
                 RiskLevel.HIGH
             ),
             (
@@ -253,7 +242,6 @@ def init_db(db: Session = None):
                 db.add(p)
 
         db.commit()
-        logger.info("Database schema initialized and seed data successfully populated.")
     except Exception as e:
         db.rollback()
         logger.error(f"Error during database initialization: {e}")
@@ -261,6 +249,3 @@ def init_db(db: Session = None):
     finally:
         if should_close:
             db.close()
-
-if __name__ == "__main__":
-    init_db()
