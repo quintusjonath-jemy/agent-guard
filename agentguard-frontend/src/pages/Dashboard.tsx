@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bot, ShieldAlert, Activity, CheckCircle2,
-  ArrowRight, TrendingUp, AlertTriangle, Radio, Zap,
-  ShieldCheck, Eye, ChevronRight,
+  Bot, ShieldAlert, Activity, CheckCircle2, ArrowRight,
+  AlertTriangle, ChevronRight, TrendingUp, TrendingDown,
+  Clock, Zap, Shield,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -15,226 +15,165 @@ import { SecurityScoreGauge } from '../components/SecurityScoreGauge';
 import { RiskBadge } from '../components/RiskBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useAuth } from '../context/AuthContext';
 
-// ── Stat Card ────────────────────────────────────────────────
-interface StatCardProps {
-  title: string;
+// ── Metric Card ──────────────────────────────────────────────
+interface MetricCardProps {
+  label: string;
   value: string | number;
   sub: string;
   icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
+  accent?: 'green' | 'red' | 'yellow' | 'default';
   trend?: string;
   trendUp?: boolean;
-  alert?: boolean;
 }
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, iconBg, iconColor, trend, trendUp, alert }) => (
-  <div className={`glass-panel p-5 flex flex-col gap-4 ${alert ? 'ring-warn' : ''}`}>
-    <div className="flex items-start justify-between">
-      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
-        <Icon className={`w-5 h-5 ${iconColor}`} />
+const MetricCard: React.FC<MetricCardProps> = ({ label, value, sub, icon: Icon, accent = 'default', trend, trendUp }) => {
+  const accentColor = accent === 'green' ? '#35B77A' : accent === 'red' ? '#F04444' : accent === 'yellow' ? '#D6A84F' : '#A1A1A1';
+  return (
+    <div className="card p-5">
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${accentColor}14` }}>
+          <Icon className="w-4 h-4" style={{ color: accentColor }} />
+        </div>
+        {trend && (
+          <div className={`flex items-center gap-1 text-[11px] font-mono ${trendUp ? 'text-success' : 'text-danger'}`}>
+            {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {trend}
+          </div>
+        )}
       </div>
-      {trend && (
-        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
-          trendUp === false
-            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-            : trendUp === true
-            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-            : 'bg-slate-800/60 text-slate-400 border border-white/[0.06]'
-        }`}>
-          {trend}
-        </span>
-      )}
+      <div className="text-[28px] font-bold text-[#F5F5F5] font-mono tracking-tight tabular-nums leading-none">{value}</div>
+      <div className="text-[12px] text-[#A1A1A1] mt-1">{label}</div>
+      <div className="text-[11px] text-[#6F6F6F] font-mono mt-0.5">{sub}</div>
     </div>
-    <div>
-      <div className="text-2xl font-extrabold font-mono text-white tabular-nums">{value}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{title}</div>
-      <div className="text-[10px] font-mono text-slate-600 mt-1">{sub}</div>
-    </div>
-  </div>
-);
+  );
+};
 
-// ── Chart Tooltip ────────────────────────────────────────────
-const ChartTooltip = ({ active, payload, label }: any) => {
+// ── Chart tooltip ─────────────────────────────────────────────
+const ChartTip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="glass-panel-elevated px-3 py-2 text-[11px] font-mono">
-      <p className="text-slate-400 mb-1">{label}</p>
+    <div className="card-elevated px-3 py-2 text-[11px] font-mono">
+      <p className="text-[#6F6F6F] mb-1">{label}</p>
       {payload.map((p: any) => (
         <div key={p.name} className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-slate-300">{p.name}:</span>
-          <span className="text-white font-semibold">{p.value}</span>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.color }} />
+          <span className="text-[#A1A1A1]">{p.name}:</span>
+          <span className="text-[#F5F5F5] font-semibold">{p.value}</span>
         </div>
       ))}
     </div>
   );
 };
 
-const DONUT_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
+const RISK_COLORS = ['#35B77A', '#D6A84F', '#E06A62', '#F04444'];
+const RISK_LABELS = ['Low', 'Medium', 'High', 'Critical'];
 
-// ── Dashboard ────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────
 export const Dashboard: React.FC = () => {
-  const [trendRange, setTrendRange] = useState<'24H' | '7D' | '30D'>('24H');
+  const [range, setRange] = useState<'24H' | '7D' | '30D'>('24H');
   const navigate = useNavigate();
-  const { liveEvents } = useWebSocket();
+  const { user } = useAuth();
+  const { isConnected, liveEvents } = useWebSocket();
 
-  const { data: statsData } = useQuery({
-    queryKey: ['dashboard_stats'],
-    queryFn: async () => (await apiClient.get('/dashboard/stats')).data.data,
-    refetchInterval: 5000,
-  });
+  const { data: stats }       = useQuery({ queryKey: ['dashboard_stats'], queryFn: () => apiClient.get('/dashboard/stats').then(r => r.data.data), refetchInterval: 30000 });
+  const { data: trends }      = useQuery({ queryKey: ['security_trends', range], queryFn: () => apiClient.get(`/dashboard/security-trends?range=${range}`).then(r => r.data.data), refetchInterval: 60000 });
+  const { data: approvals }   = useQuery({ queryKey: ['approvals'], queryFn: () => apiClient.get('/approvals?status=PENDING&limit=3').then(r => r.data.data) });
+  const { data: agents }      = useQuery({ queryKey: ['agents'], queryFn: () => apiClient.get('/agents').then(r => r.data.data) });
+  const { data: incidents }   = useQuery({ queryKey: ['incidents'], queryFn: () => apiClient.get('/incidents?status=OPEN&limit=3').then(r => r.data.data) });
 
-  const { data: trendsData } = useQuery({
-    queryKey: ['security_trends', trendRange],
-    queryFn: async () => (await apiClient.get(`/dashboard/security-trends?range_view=${trendRange}`)).data.data,
-  });
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const { data: riskData } = useQuery({
-    queryKey: ['risk_distribution'],
-    queryFn: async () => (await apiClient.get('/dashboard/risk-distribution')).data.data,
-  });
+  const chartData = trends?.chart || [];
+  const riskDist  = stats?.risk_distribution || { low: 0, medium: 0, high: 0, critical: 0 };
+  const riskPie   = [
+    { name: 'Low', value: riskDist.low || 0 },
+    { name: 'Medium', value: riskDist.medium || 0 },
+    { name: 'High', value: riskDist.high || 0 },
+    { name: 'Critical', value: riskDist.critical || 0 },
+  ].filter(r => r.value > 0);
 
-  const { data: riskyAgents } = useQuery({
-    queryKey: ['top_risky_agents'],
-    queryFn: async () => (await apiClient.get('/dashboard/top-risky-agents')).data.data,
-  });
+  const pendingApprovals = Array.isArray(approvals) ? approvals : (approvals?.items ?? []);
+  const openIncidents    = Array.isArray(incidents) ? incidents : (incidents?.items ?? []);
+  const agentList        = Array.isArray(agents) ? agents : (agents?.items ?? []);
 
-  const { data: pendingApprovals } = useQuery({
-    queryKey: ['approvals_pending'],
-    queryFn: async () => (await apiClient.get('/approvals?status_filter=PENDING')).data.data,
-  });
-
-  const stats = statsData || {
-    active_agents: 4, actions_today: 4281, blocked_today: 47,
-    pending_approvals: 3, open_incidents: 2, security_score: 96,
+  const formatTs = (ts: string) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
-  const pieData = riskData
-    ? [
-        { name: 'Low', value: riskData.low || 1 },
-        { name: 'Medium', value: riskData.medium || 0 },
-        { name: 'High', value: riskData.high || 0 },
-        { name: 'Critical', value: riskData.critical || 0 },
-      ]
-    : [{ name: 'Low', value: 85 }, { name: 'Medium', value: 10 }, { name: 'High', value: 4 }, { name: 'Critical', value: 1 }];
-
-  const totalEvents = pieData.reduce((a, c) => a + c.value, 0);
-
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6 max-w-[1400px] mx-auto animate-fade-in">
 
-      {/* ── 1. Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* ── Header ─────────────────────────────────── */}
+      <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-extrabold text-white tracking-tight">Security Control Center</h2>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-mono font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              LIVE SOC
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time policy enforcement, AI agent governance, and threat mitigation.
+          <p className="text-[13px] text-[#6F6F6F] mb-1">{greeting}, {user?.name?.split(' ')[0] || 'Admin'}</p>
+          <h1 className="text-[24px] font-semibold text-[#F5F5F5] tracking-tight">Security Overview</h1>
+          <p className="text-[13px] text-[#6F6F6F] mt-1">
+            {now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => navigate('/live-monitor')}
-            className="btn-secondary text-[11px]"
-          >
-            <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            Live Monitor
-          </button>
-          <button
-            onClick={() => navigate('/security-tests')}
-            className="btn-primary text-[11px]"
-          >
-            <Zap className="w-3.5 h-3.5" />
-            Security Lab
-          </button>
+        <div className="flex items-center gap-1.5 text-[12px]">
+          <span className={`live-dot ${isConnected ? '' : 'gray'}`} />
+          <span className="text-[#6F6F6F] font-mono">{isConnected ? 'Live' : 'Connecting'}</span>
         </div>
       </div>
 
-      {/* ── 2. Security Score Gauge ── */}
-      <SecurityScoreGauge
-        score={stats.security_score}
-        activeAgents={stats.active_agents}
-        activePolicies={5}
-        totalTools={10}
-      />
+      {/* ── System Health + Metrics ─────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {/* Health card */}
+        <div className="card p-6 flex flex-col items-center justify-center md:col-span-1">
+          <SecurityScoreGauge score={stats?.security_score || 0} size={96} />
+          <div className="mt-4 text-center">
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <span className="live-dot" />
+              <span className="text-[11px] text-[#A1A1A1]">All systems operational</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-center">
+              {[
+                { label: 'Agents', val: `${stats?.active_agents || 0}/${stats?.total_agents || 0}` },
+                { label: 'Policies', val: stats?.active_policies || 0 },
+                { label: 'Tools', val: stats?.active_tools || 0 },
+                { label: 'Gateway', val: 'ON' },
+              ].map(r => (
+                <div key={r.label}>
+                  <div className="text-[12px] font-semibold text-[#F5F5F5] font-mono">{r.val}</div>
+                  <div className="text-[10px] text-[#6F6F6F]">{r.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-      {/* ── 3. Stat Grid ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Active AI Agents"
-          value={stats.active_agents}
-          sub="Autonomous models governed"
-          icon={Bot}
-          iconBg="bg-cyan-500/10"
-          iconColor="text-cyan-400"
-          trend="+2 fleet"
-          trendUp={true}
-        />
-        <StatCard
-          title="Actions Processed"
-          value={stats.actions_today.toLocaleString()}
-          sub="Total executions today"
-          icon={Activity}
-          iconBg="bg-indigo-500/10"
-          iconColor="text-indigo-400"
-          trend="+18% rate"
-          trendUp={true}
-        />
-        <StatCard
-          title="Blocked Actions"
-          value={stats.blocked_today}
-          sub="Policy & permission violations"
-          icon={ShieldAlert}
-          iconBg="bg-red-500/10"
-          iconColor="text-red-400"
-          trend={`+7 today`}
-          trendUp={false}
-          alert={stats.blocked_today > 0}
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={stats.pending_approvals}
-          sub="Requires human authorization"
-          icon={CheckCircle2}
-          iconBg="bg-amber-500/10"
-          iconColor="text-amber-400"
-          trend="Attention"
-          trendUp={false}
-          alert={stats.pending_approvals > 0}
-        />
+        {/* Metrics */}
+        <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard label="Active Agents" value={stats?.active_agents ?? '—'} sub="In production"       icon={Bot}         accent="green"  trend="+2 today"   trendUp />
+          <MetricCard label="Actions Today" value={stats?.executions_today ?? '—'} sub="Gateway requests" icon={Zap}         accent="default" />
+          <MetricCard label="Blocked Actions" value={stats?.blocked_today ?? '—'}  sub="Policy violations" icon={ShieldAlert} accent="red"    trend={stats?.blocked_today > 0 ? `${stats.blocked_today} blocked` : undefined} trendUp={false} />
+          <MetricCard label="Pending Approvals" value={stats?.pending_approvals ?? '—'} sub={stats?.pending_approvals > 0 ? 'Requires attention' : 'No actions required'} icon={CheckCircle2} accent={stats?.pending_approvals > 0 ? 'yellow' : 'green'} />
+        </div>
       </div>
 
-      {/* ── 4. Charts Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-        {/* Activity Chart */}
-        <div className="lg:col-span-2 glass-panel p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+      {/* ── Charts Row ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Activity chart */}
+        <div className="card p-5 lg:col-span-2">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white">Security Activity Trends</h3>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5 font-mono">Allowed executions vs. blocked violations</p>
+              <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Security Activity</h2>
+              <p className="text-[12px] text-[#6F6F6F] mt-0.5">Allowed vs blocked actions</p>
             </div>
-
-            <div className="inline-flex rounded-xl bg-dark-900/80 p-1 border border-white/[0.05]">
-              {(['24H', '7D', '30D'] as const).map((r) => (
+            <div className="flex items-center gap-1 border border-[#2A2A2A] rounded-lg p-1">
+              {(['24H', '7D', '30D'] as const).map(r => (
                 <button
                   key={r}
-                  onClick={() => setTrendRange(r)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-mono transition-all ${
-                    trendRange === r
-                      ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/25'
-                      : 'text-slate-500 hover:text-white'
+                  onClick={() => setRange(r)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
+                    range === r ? 'bg-[#1A1A1A] text-[#F5F5F5]' : 'text-[#6F6F6F] hover:text-[#A1A1A1]'
                   }`}
                 >
                   {r}
@@ -242,224 +181,246 @@ export const Dashboard: React.FC = () => {
               ))}
             </div>
           </div>
-
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendsData || []} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                <defs>
-                  <linearGradient id="gradAllowed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="gradBlocked" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="timestamp" tick={{ fill: '#475569', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#475569', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip />} />
-                <Area type="monotone" dataKey="allowed" name="Allowed" stroke="#10b981" strokeWidth={2} fill="url(#gradAllowed)" />
-                <Area type="monotone" dataKey="blocked" name="Blocked" stroke="#ef4444" strokeWidth={2} fill="url(#gradBlocked)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Legend */}
-          <div className="flex items-center gap-5 mt-3 pt-3 border-t border-white/[0.04]">
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
-              <span className="w-3 h-0.5 bg-emerald-400 rounded" />
-              Allowed Actions
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
-              <span className="w-3 h-0.5 bg-red-400 rounded" />
-              Blocked Violations
-            </div>
-          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gAllowed" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#35B77A" stopOpacity={0.12} />
+                  <stop offset="100%" stopColor="#35B77A" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gBlocked" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F04444" stopOpacity={0.1} />
+                  <stop offset="100%" stopColor="#F04444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="label" tick={{ fill: '#6F6F6F', fontSize: 10, fontFamily: 'JetBrains Mono' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fill: '#6F6F6F', fontSize: 10, fontFamily: 'JetBrains Mono' }} tickLine={false} axisLine={false} />
+              <Tooltip content={<ChartTip />} cursor={{ stroke: '#2A2A2A' }} />
+              <Area type="monotone" dataKey="allowed" name="Allowed" stroke="#35B77A" strokeWidth={1.5} fill="url(#gAllowed)" dot={false} />
+              <Area type="monotone" dataKey="blocked" name="Blocked" stroke="#F04444" strokeWidth={1.5} fill="url(#gBlocked)" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Live Security Feed */}
-        <div className="glass-panel p-5 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="relative flex">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping absolute opacity-75" />
-                <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              </span>
-              <h3 className="text-sm font-bold text-white">Live Security Stream</h3>
-            </div>
-            <span className="section-label">WebSocket</span>
+        {/* Risk donut */}
+        <div className="card p-5">
+          <div className="mb-4">
+            <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Risk Distribution</h2>
+            <p className="text-[12px] text-[#6F6F6F] mt-0.5">Security event breakdown</p>
           </div>
-
-          <div className="flex-1 space-y-2 overflow-y-auto">
-            {liveEvents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-36 text-center">
-                <Radio className="w-6 h-6 text-slate-700 mb-2" />
-                <p className="text-[11px] font-mono text-slate-600">Listening for agent actions...</p>
+          {riskPie.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={140}>
+                <PieChart>
+                  <Pie data={riskPie} cx="50%" cy="50%" innerRadius={44} outerRadius={60} dataKey="value" paddingAngle={2} startAngle={90} endAngle={-270}>
+                    {riskPie.map((_, i) => <Cell key={i} fill={RISK_COLORS[i] ?? RISK_COLORS[3]} stroke="none" />)}
+                  </Pie>
+                  <Tooltip formatter={(v: number, n: string) => [v, n]} contentStyle={{ background: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: 8, fontSize: 11, fontFamily: 'JetBrains Mono' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                {RISK_LABELS.map((l, i) => (
+                  <div key={l} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: RISK_COLORS[i] }} />
+                    <span className="text-[11px] text-[#A1A1A1]">{l}</span>
+                    <span className="text-[11px] font-mono text-[#F5F5F5] ml-auto">{riskDist[l.toLowerCase() as keyof typeof riskDist] || 0}</span>
+                  </div>
+                ))}
               </div>
-            ) : (
-              liveEvents.slice(0, 6).map((evt, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => evt.data.execution_id && navigate(`/executions/${evt.data.execution_id}`)}
-                  className="p-3 rounded-xl bg-dark-800/60 border border-white/[0.04] hover:border-white/[0.08] cursor-pointer transition-all group"
-                >
-                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 mb-1">
-                    <span className="font-semibold text-white text-xs">{evt.data.agent_name || 'Agent'}</span>
-                    <span>{evt.data.timestamp ? evt.data.timestamp.slice(11, 19) : 'Now'}</span>
-                  </div>
-                  <div className="text-[11px] text-slate-300 truncate">{evt.data.action_name} via {evt.data.tool_name}</div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <StatusBadge status={evt.data.decision || 'PROCESSED'} />
-                    <span className="text-[10px] font-mono text-slate-600">Risk: {evt.data.risk_score ?? 0}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <button
-            onClick={() => navigate('/live-monitor')}
-            className="mt-3 w-full btn-secondary justify-center text-[11px] py-2"
-          >
-            Open Full Monitor
-            <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
-          </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[180px] text-center">
+              <Shield className="w-8 h-8 text-[#2A2A2A] mb-2" />
+              <p className="text-[12px] text-[#6F6F6F]">No security events yet</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── 5. Risk + Agents Row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ── Bottom row ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* Donut Chart */}
-        <div className="glass-panel p-6">
-          <h3 className="text-sm font-bold text-white mb-0.5">Risk Distribution</h3>
-          <p className="text-[11px] font-mono text-slate-500 mb-4">Categorized agent action telemetry</p>
-
-          <div className="relative h-44 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute text-center pointer-events-none">
-              <div className="text-xl font-extrabold font-mono text-white">{totalEvents}</div>
-              <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wide">Total</div>
+        {/* Live security events */}
+        <div className="card lg:col-span-2 flex flex-col overflow-hidden" style={{ maxHeight: 380 }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A] flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Live Security Events</h2>
+              <span className="flex items-center gap-1 text-[10px] font-mono text-[#6F6F6F]">
+                <span className={`live-dot ${isConnected ? '' : 'gray'}`} style={{ width: 5, height: 5 }} />
+                LIVE
+              </span>
             </div>
+            <button onClick={() => navigate('/executions')} className="btn-ghost btn-xs">View all</button>
           </div>
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 pt-4 border-t border-white/[0.04]">
-            {[
-              { label: 'LOW',      color: 'bg-emerald-400', val: pieData[0].value },
-              { label: 'MEDIUM',   color: 'bg-amber-400',   val: pieData[1].value },
-              { label: 'HIGH',     color: 'bg-orange-400',  val: pieData[2].value },
-              { label: 'CRITICAL', color: 'bg-red-400',     val: pieData[3].value },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between text-[10px] font-mono">
-                <div className="flex items-center gap-1.5 text-slate-400">
-                  <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                  {item.label}
-                </div>
-                <span className="text-slate-300 font-semibold">{item.val}</span>
+          <div className="flex-1 overflow-y-auto divide-y divide-[#1F1F1F]">
+            {liveEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-12 text-center px-6">
+                <Activity className="w-8 h-8 text-[#2A2A2A] mb-2" />
+                <p className="text-[13px] text-[#6F6F6F]">Monitoring agent activity...</p>
+                <p className="text-[11px] text-[#6F6F6F] mt-1 font-mono">Events will appear here in real time</p>
               </div>
-            ))}
+            ) : (
+              liveEvents.slice(0, 20).map((ev, i) => {
+                const d = ev.data;
+                const isBlocked = d.decision === 'BLOCKED' || d.decision === 'FAILED';
+                const isCritical = d.risk_level === 'CRITICAL';
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 px-5 py-3.5 hover:bg-[#1A1A1A] transition-colors cursor-pointer animate-enter-row ${isCritical ? 'border-l-2 border-[#F04444]' : ''}`}
+                    onClick={() => d.execution_id && navigate(`/executions/${d.execution_id}`)}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${isBlocked ? 'bg-[#F04444]' : 'bg-[#35B77A]'}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[12px] font-medium text-[#F5F5F5]">{d.agent_name ?? '—'}</span>
+                        <span className="text-[11px] font-mono text-[#6F6F6F]">{d.tool_name}</span>
+                        {d.action_name && d.action_name !== d.tool_name && (
+                          <span className="text-[11px] font-mono text-[#6F6F6F]">· {d.action_name}</span>
+                        )}
+                      </div>
+                      {d.reason && isBlocked && (
+                        <p className="text-[11px] text-[#6F6F6F] mt-0.5 truncate">{d.reason}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {d.risk_level && <RiskBadge level={d.risk_level} />}
+                      {d.decision && <StatusBadge status={d.decision} />}
+                      <span className="text-[10px] font-mono text-[#6F6F6F]">{d.timestamp ? formatTs(d.timestamp) : ''}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
-        {/* Risky Agents Table */}
-        <div className="lg:col-span-2 glass-panel p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-white">Agents Requiring Attention</h3>
-              <p className="text-[11px] font-mono text-slate-500 mt-0.5">Blocked action telemetry per registered agent</p>
+        {/* Pending approvals + agents */}
+        <div className="flex flex-col gap-4">
+          {/* Approvals */}
+          <div className="card flex-1">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
+              <h2 className="text-[13px] font-semibold text-[#F5F5F5]">Pending Approvals</h2>
+              {pendingApprovals.length > 0 && (
+                <span className="badge badge-pending">{pendingApprovals.length}</span>
+              )}
             </div>
-            <button
-              onClick={() => navigate('/agents')}
-              className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
-            >
-              View Fleet <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            {pendingApprovals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center px-4">
+                <CheckCircle2 className="w-6 h-6 text-[#2A2A2A] mb-2" />
+                <p className="text-[12px] text-[#6F6F6F]">No pending approvals</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#1F1F1F]">
+                {pendingApprovals.map((a: any) => (
+                  <div
+                    key={a.id}
+                    className="px-5 py-3.5 hover:bg-[#1A1A1A] cursor-pointer transition-colors"
+                    onClick={() => navigate('/approvals')}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[12px] font-medium text-[#F5F5F5]">{a.agent_name}</span>
+                      <RiskBadge level={a.risk_level || 'HIGH'} />
+                    </div>
+                    <div className="text-[11px] font-mono text-[#6F6F6F]">{a.tool_name} · {a.action_name}</div>
+                    <button
+                      className="btn-ghost btn-xs mt-2 text-brand hover:text-brand"
+                      onClick={e => { e.stopPropagation(); navigate('/approvals'); }}
+                    >
+                      Review →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Open incidents */}
+          {openIncidents.length > 0 && (
+            <div className="card">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
+                <h2 className="text-[13px] font-semibold text-[#F5F5F5]">Open Incidents</h2>
+                <span className="badge badge-critical">{openIncidents.length}</span>
+              </div>
+              <div className="divide-y divide-[#1F1F1F]">
+                {openIncidents.slice(0, 3).map((inc: any) => (
+                  <div
+                    key={inc.id}
+                    className="px-5 py-3.5 hover:bg-[#1A1A1A] cursor-pointer transition-colors"
+                    onClick={() => navigate('/incidents')}
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[#F04444] flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[12px] text-[#F5F5F5] truncate-2 leading-snug">{inc.title}</p>
+                        <p className="text-[10px] font-mono text-[#6F6F6F] mt-0.5">{inc.agent_name} · {inc.severity}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Agents requiring attention ──────────────── */}
+      {agentList.filter((a: any) => a.risk_level === 'HIGH' || a.risk_level === 'CRITICAL').length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
+            <div>
+              <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Agents Requiring Attention</h2>
+              <p className="text-[12px] text-[#6F6F6F] mt-0.5">Agents with elevated risk profiles</p>
+            </div>
+            <button onClick={() => navigate('/agents')} className="btn-ghost btn-xs">View all agents</button>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="data-table">
               <thead>
-                <tr className="border-b border-white/[0.05]">
-                  {['Agent', 'Risk', 'Blocked', 'Score', 'Status', ''].map((h) => (
-                    <th key={h} className="py-2 px-2.5 section-label">{h}</th>
-                  ))}
+                <tr>
+                  <th>Agent</th>
+                  <th>Risk Level</th>
+                  <th className="hidden sm:table-cell">Blocked Actions</th>
+                  <th className="hidden md:table-cell">Status</th>
+                  <th className="hidden lg:table-cell">Last Activity</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {(riskyAgents || []).map((agent: any) => (
-                  <tr key={agent.agent_id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 px-2.5">
+                {agentList.filter((a: any) => ['HIGH', 'CRITICAL'].includes(a.risk_level)).slice(0, 5).map((a: any) => (
+                  <tr key={a.id} className="cursor-pointer" onClick={() => navigate(`/agents/${a.id}`)}>
+                    <td>
                       <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-dark-700 border border-white/[0.06] flex items-center justify-center">
-                          <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                        <div className="w-6 h-6 rounded-md bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center">
+                          <Bot className="w-3.5 h-3.5 text-[#6F6F6F]" />
                         </div>
-                        <span className="text-xs font-semibold text-white">{agent.agent_name}</span>
+                        <div>
+                          <div className="text-[13px] text-[#F5F5F5] font-medium">{a.name}</div>
+                          <div className="text-[11px] text-[#6F6F6F] font-mono">{a.provider}</div>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-3 px-2.5"><RiskBadge level={agent.risk_level} size="sm" /></td>
-                    <td className="py-3 px-2.5 font-mono text-xs text-red-400 font-semibold">{agent.blocked_actions}</td>
-                    <td className="py-3 px-2.5 font-mono text-xs text-slate-200 font-bold">{agent.security_score}/100</td>
-                    <td className="py-3 px-2.5"><StatusBadge status={agent.status} /></td>
-                    <td className="py-3 px-2.5 text-right">
-                      <button
-                        onClick={() => navigate(`/agents/${agent.agent_id}`)}
-                        className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
-                      >
-                        <Eye className="w-3 h-3" /> Inspect
-                      </button>
+                    <td><RiskBadge level={a.risk_level} /></td>
+                    <td className="hidden sm:table-cell font-mono text-[#A1A1A1]">{a.blocked_executions ?? '—'}</td>
+                    <td className="hidden md:table-cell"><StatusBadge status={a.status} /></td>
+                    <td className="hidden lg:table-cell text-[#6F6F6F] font-mono text-[11px]">
+                      {a.last_activity ? new Date(a.last_activity).toLocaleString() : '—'}
+                    </td>
+                    <td>
+                      <ChevronRight className="w-4 h-4 text-[#6F6F6F]" />
                     </td>
                   </tr>
                 ))}
-                {(!riskyAgents || riskyAgents.length === 0) && (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center">
-                      <ShieldCheck className="w-8 h-8 text-emerald-400/30 mx-auto mb-2" />
-                      <p className="text-xs font-mono text-slate-600">All agents operating within policy bounds</p>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
         </div>
-      </div>
-
-      {/* ── 6. Pending Approvals Alert ── */}
-      {pendingApprovals && pendingApprovals.length > 0 && (
-        <div className="glass-panel-warn p-5 ring-warn flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-6 h-6 text-amber-400" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white">
-                {pendingApprovals.length} High-Risk Action{pendingApprovals.length > 1 ? 's' : ''} Require Human Approval
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Autonomous agents have requested operations exceeding automated policy limits.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate('/approvals')}
-            className="btn-primary shrink-0 bg-amber-500 hover:bg-amber-400 text-dark-950 shadow-glow-amber"
-          >
-            Review Approval Inbox
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
       )}
-
     </div>
   );
 };
+
+function formatTs(ts: string) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}

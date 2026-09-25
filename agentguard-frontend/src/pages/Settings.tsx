@@ -1,81 +1,101 @@
-import React from 'react';
-import { Settings as SettingsIcon, Shield, Database, Bell, Lock, Server } from 'lucide-react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Settings as SettingsIcon, User, Bell, Shield, LogOut } from 'lucide-react';
 
 export const Settings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [notifications, setNotifications] = useState(true);
+  const [emailAlerts, setEmailAlerts] = useState(false);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300 max-w-4xl">
-      <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">
-          Platform Governance & Security Settings
-        </h2>
-        <p className="text-xs text-slate-400 mt-1">
-          System policies, RBAC access configuration, and audit retention settings.
-        </p>
+    <div className="p-6 max-w-[700px] mx-auto animate-fade-in">
+      <div className="mb-6">
+        <h1 className="text-[22px] font-semibold text-[#F5F5F5]">Settings</h1>
+        <p className="text-[13px] text-[#6F6F6F] mt-1">Manage your account and platform preferences</p>
       </div>
 
-      <div className="space-y-4">
-        {/* User Identity Section */}
-        <div className="glass-panel p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-500/30">
-              <Shield className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Active Administrator Identity</h3>
-              <p className="text-xs text-slate-400">Authenticated user profile and permissions.</p>
-            </div>
+      {/* Profile */}
+      <div className="card p-6 mb-5">
+        <div className="flex items-center gap-3 mb-5">
+          <User className="w-4 h-4 text-[#6F6F6F]" />
+          <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Profile</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">Name</label>
+            <input className="input-field" defaultValue={user?.name || ''} placeholder="Your name" />
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
-            <div className="bg-dark-950 p-3 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-500 uppercase">NAME</span>
-              <div className="font-bold text-white mt-0.5">{user?.name}</div>
-            </div>
-            <div className="bg-dark-950 p-3 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-500 uppercase">EMAIL</span>
-              <div className="font-bold text-cyan-400 mt-0.5">{user?.email}</div>
-            </div>
-            <div className="bg-dark-950 p-3 rounded-lg border border-slate-800">
-              <span className="text-[10px] text-slate-500 uppercase">ROLE</span>
-              <div className="font-bold text-emerald-400 mt-0.5">{user?.role}</div>
-            </div>
+          <div>
+            <label className="input-label">Email</label>
+            <input className="input-field" defaultValue={user?.email || ''} readOnly disabled />
+          </div>
+          <div>
+            <label className="input-label">Role</label>
+            <input className="input-field" value={user?.role?.replace('_', ' ') || '—'} readOnly disabled />
           </div>
         </div>
-
-        {/* Security & System Architecture */}
-        <div className="glass-panel p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-dark-950 text-emerald-400 border border-slate-800">
-              <Server className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">Engine Architecture Configuration</h3>
-              <p className="text-xs text-slate-400">Deterministic security controls status.</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 font-mono text-xs">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-dark-950 border border-slate-800">
-              <span className="text-slate-300">Deterministic Least Privilege Engine</span>
-              <span className="text-emerald-400 font-bold">ENFORCED</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-dark-950 border border-slate-800">
-              <span className="text-slate-300">Sensitive Data (DLP) Regex Scanner</span>
-              <span className="text-emerald-400 font-bold">ACTIVE (8 Patterns)</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-dark-950 border border-slate-800">
-              <span className="text-slate-300">Sliding Window Rate Limiter (Redis)</span>
-              <span className="text-emerald-400 font-bold">5 REQ / MIN ON AUTH</span>
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-dark-950 border border-slate-800">
-              <span className="text-slate-300">WebSocket Live Event Broadcaster</span>
-              <span className="text-cyan-400 font-bold">STREAMING ACTIVE</span>
-            </div>
-          </div>
+        <div className="mt-4 flex justify-end">
+          <button className="btn-primary btn-sm">Save changes</button>
         </div>
+      </div>
+
+      {/* Notifications */}
+      <div className="card p-6 mb-5">
+        <div className="flex items-center gap-3 mb-5">
+          <Bell className="w-4 h-4 text-[#6F6F6F]" />
+          <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Notifications</h2>
+        </div>
+        <div className="space-y-4">
+          {[
+            { key: 'notif', label: 'Live event notifications', desc: 'Browser notifications for blocked actions', state: notifications, set: setNotifications },
+            { key: 'email', label: 'Email alerts', desc: 'Email alerts for critical security incidents', state: emailAlerts, set: setEmailAlerts },
+          ].map(s => (
+            <div key={s.key} className="flex items-center justify-between py-1">
+              <div>
+                <div className="text-[13px] text-[#F5F5F5]">{s.label}</div>
+                <div className="text-[11px] text-[#6F6F6F] mt-0.5">{s.desc}</div>
+              </div>
+              <button
+                className={`w-10 h-6 rounded-full transition-all relative ${s.state ? 'bg-brand' : 'bg-[#2A2A2A]'}`}
+                onClick={() => s.set(!s.state)}
+                role="switch"
+                aria-checked={s.state}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${s.state ? 'left-5' : 'left-1'}`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Security */}
+      <div className="card p-6 mb-5">
+        <div className="flex items-center gap-3 mb-5">
+          <Shield className="w-4 h-4 text-[#6F6F6F]" />
+          <h2 className="text-[14px] font-semibold text-[#F5F5F5]">Security</h2>
+        </div>
+        <div>
+          <label className="input-label">Current Password</label>
+          <input className="input-field mb-3" type="password" placeholder="••••••••" />
+          <label className="input-label">New Password</label>
+          <input className="input-field mb-3" type="password" placeholder="••••••••" />
+          <label className="input-label">Confirm Password</label>
+          <input className="input-field mb-4" type="password" placeholder="••••••••" />
+          <button className="btn-primary btn-sm">Update password</button>
+        </div>
+      </div>
+
+      {/* Sign out */}
+      <div className="card p-5 flex items-center justify-between" style={{ borderColor: 'rgba(224,106,98,0.15)' }}>
+        <div>
+          <div className="text-[13px] font-medium text-[#F5F5F5]">Sign out</div>
+          <div className="text-[12px] text-[#6F6F6F] mt-0.5">End your current session</div>
+        </div>
+        <button onClick={logout} className="btn-danger btn-sm">
+          <LogOut className="w-3.5 h-3.5" /> Sign out
+        </button>
       </div>
     </div>
   );

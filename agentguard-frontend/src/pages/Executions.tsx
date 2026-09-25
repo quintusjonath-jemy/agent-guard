@@ -1,146 +1,98 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { ScrollText, Search, Filter, ShieldAlert, ArrowRight, Eye } from 'lucide-react';
+import { ScrollText, Search, Filter, ChevronRight } from 'lucide-react';
 import apiClient from '../api/client';
-import { ExecutionListItem } from '../types';
 import { RiskBadge } from '../components/RiskBadge';
 import { StatusBadge } from '../components/StatusBadge';
 
 export const Executions: React.FC = () => {
-  const [decisionFilter, setDecisionFilter] = useState<string>('');
-  const [search, setSearch] = useState<string>('');
   const navigate = useNavigate();
+  const [decision, setDecision] = useState('');
+  const [search, setSearch] = useState('');
 
-  const { data: executions, isLoading } = useQuery({
-    queryKey: ['executions', decisionFilter],
-    queryFn: async () => {
-      let url = '/executions?limit=50';
-      if (decisionFilter) url += `&decision=${decisionFilter}`;
-      const res = await apiClient.get(url);
-      return res.data.data as ExecutionListItem[];
-    },
+  const { data, isLoading } = useQuery({
+    queryKey: ['executions', decision],
+    queryFn: () => apiClient.get(`/executions${decision ? `?decision=${decision}` : ''}&limit=100`).then(r => r.data.data),
+    refetchInterval: 10000,
   });
 
-  const filtered = (executions || []).filter((e) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      (e.agent_name?.toLowerCase() || '').includes(q) ||
-      (e.tool_name?.toLowerCase() || '').includes(q) ||
-      (e.action_name?.toLowerCase() || '').includes(q) ||
-      (e.reason && e.reason.toLowerCase().includes(q))
-    );
-  });
+  const rows = Array.isArray(data) ? data : (data?.items ?? []);
+  const filtered = rows.filter((r: any) =>
+    !search || r.agent_name?.toLowerCase().includes(search.toLowerCase()) || r.tool_name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const fmt = (ts: string) => ts ? new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Execution & Security Investigation Console
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Immutable log of all evaluated AI agent tool requests with deep step-by-step decision breakdown.
-          </p>
-        </div>
+    <div className="p-6 max-w-[1200px] mx-auto animate-fade-in">
+      <div className="mb-6">
+        <h1 className="text-[22px] font-semibold text-[#F5F5F5]">Executions</h1>
+        <p className="text-[13px] text-[#6F6F6F] mt-1">Complete action history and security decisions</p>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="glass-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            placeholder="Search by agent, tool, or policy violation reason..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-          />
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6F6F6F]" />
+          <input className="input-field pl-9" placeholder="Search agent or tool..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          <select
-            value={decisionFilter}
-            onChange={(e) => setDecisionFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-xs text-slate-300 focus:outline-none focus:border-cyan-500 font-mono"
-          >
-            <option value="">All Decisions</option>
-            <option value="ALLOWED">ALLOWED</option>
-            <option value="BLOCKED">BLOCKED</option>
-            <option value="PENDING_APPROVAL">PENDING APPROVAL</option>
-          </select>
-        </div>
+        <select
+          className="input-field w-auto"
+          value={decision}
+          onChange={e => setDecision(e.target.value)}
+        >
+          <option value="">All decisions</option>
+          <option value="ALLOWED">Allowed</option>
+          <option value="BLOCKED">Blocked</option>
+          <option value="PENDING">Pending</option>
+          <option value="FAILED">Failed</option>
+        </select>
       </div>
 
-      {/* Table */}
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] font-mono uppercase tracking-wider text-slate-500 bg-dark-950/60">
-                <th className="py-3 px-4">Time</th>
-                <th className="py-3 px-4">Agent</th>
-                <th className="py-3 px-4">Tool & Action</th>
-                <th className="py-3 px-4">Risk Telemetry</th>
-                <th className="py-3 px-4">Decision</th>
-                <th className="py-3 px-4">Duration</th>
-                <th className="py-3 px-4 text-right">Inspect</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 text-xs font-mono">
-              {filtered.length === 0 ? (
+      <div className="card overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 space-y-3">
+            {[...Array(8)].map((_, i) => <div key={i} className="skeleton h-10 w-full" />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <ScrollText className="w-8 h-8 text-[#2A2A2A] mb-3" />
+            <p className="text-[14px] text-[#6F6F6F]">No executions found</p>
+            <p className="text-[12px] text-[#6F6F6F] mt-1">Executions will appear here once agents start making requests</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
-                    No executions matched the selected filter.
-                  </td>
+                  <th>ID</th>
+                  <th>Timestamp</th>
+                  <th>Agent</th>
+                  <th>Tool</th>
+                  <th>Risk</th>
+                  <th>Decision</th>
+                  <th>Duration</th>
+                  <th></th>
                 </tr>
-              ) : (
-                filtered.map((item) => (
-                  <tr
-                    key={item.id}
-                    onClick={() => navigate(`/executions/${item.id}`)}
-                    className="hover:bg-dark-850/60 cursor-pointer transition-colors"
-                  >
-                    <td className="py-3 px-4 text-slate-400">
-                      {item.created_at ? new Date(item.created_at).toLocaleTimeString() : 'N/A'}
-                    </td>
-                    <td className="py-3 px-4 font-bold text-white">
-                      {item.agent_name}
-                    </td>
-                    <td className="py-3 px-4 text-slate-300">
-                      <span className="text-cyan-400 font-semibold">{item.tool_name}</span>
-                      <span className="text-slate-500 ml-1">({item.action_name})</span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <RiskBadge level={item.risk_level} score={item.risk_score} size="sm" />
-                    </td>
-                    <td className="py-3 px-4">
-                      <StatusBadge status={item.decision} />
-                    </td>
-                    <td className="py-3 px-4 text-slate-400">
-                      {item.duration_ms}ms
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/executions/${item.id}`);
-                        }}
-                        className="p-1.5 rounded bg-dark-950 border border-slate-800 text-cyan-400 hover:text-cyan-300 hover:border-cyan-500/40 transition-all inline-flex items-center gap-1 text-[11px]"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Inspect</span>
-                      </button>
-                    </td>
+              </thead>
+              <tbody>
+                {filtered.map((ex: any) => (
+                  <tr key={ex.id} className="cursor-pointer" onClick={() => navigate(`/executions/${ex.id}`)}>
+                    <td className="font-mono text-[11px] text-[#6F6F6F]">#{ex.id}</td>
+                    <td className="font-mono text-[11px] text-[#6F6F6F] whitespace-nowrap">{fmt(ex.created_at)}</td>
+                    <td className="text-[#F5F5F5] font-medium text-[13px]">{ex.agent_name}</td>
+                    <td className="font-mono text-[12px] text-[#A1A1A1]">{ex.tool_name}</td>
+                    <td><RiskBadge level={ex.risk_level} score={ex.risk_score} /></td>
+                    <td><StatusBadge status={ex.decision} /></td>
+                    <td className="font-mono text-[11px] text-[#6F6F6F]">{ex.duration_ms ? `${ex.duration_ms.toFixed(0)}ms` : '—'}</td>
+                    <td><ChevronRight className="w-4 h-4 text-[#6F6F6F]" /></td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
