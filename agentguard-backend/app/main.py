@@ -32,11 +32,18 @@ setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up AgentGuard Security Gateway...")
-    try:
-        init_db()
-        logger.info("AgentGuard database verification & seed check complete.")
-    except Exception as e:
-        logger.error(f"Database startup sync warning: {e}")
+    import time
+    for attempt in range(1, 31):
+        try:
+            init_db()
+            logger.info("AgentGuard database verification & seed check complete.")
+            break
+        except Exception as e:
+            if attempt == 30:
+                logger.error(f"Failed to connect to database after 30 attempts: {e}")
+            else:
+                logger.warning(f"Waiting for database to be ready (attempt {attempt}/30)...")
+                time.sleep(2)
     yield
     logger.info("Shutting down AgentGuard Security Gateway...")
 
