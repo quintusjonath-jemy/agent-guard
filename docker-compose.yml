@@ -42,7 +42,8 @@ services:
       - DATABASE_URL=mysql+pymysql://agentguard_user:agentguard_secure_password@mysql:3306/agentguard_db
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=super-secret-agentguard-jwt-key-change-in-production-min-32-chars-long
-      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:5678
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/agent-webhook
       - LOG_LEVEL=INFO
     ports:
       - "8000:8000"
@@ -64,6 +65,7 @@ services:
       - DATABASE_URL=mysql+pymysql://agentguard_user:agentguard_secure_password@mysql:3306/agentguard_db
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=super-secret-agentguard-jwt-key-change-in-production-min-32-chars-long
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/agent-webhook
     depends_on:
       - mysql
       - redis
@@ -83,6 +85,36 @@ services:
     networks:
       - agentguard-network
 
+  # ── n8n: Autonomous Agent Orchestration Engine ─────────────
+  # Sits on the same Docker network so it can reach:
+  #   backend  →  http://backend:8000
+  #   redis    →  redis://redis:6379
+  # The agentguard-n8n-workflow.json can be imported as-is.
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: agentguard-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Kolkata
+      - TZ=Asia/Kolkata
+      # Webhook URL shown in the n8n UI (host-visible address)
+      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      # Disable telemetry / onboarding
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_CORS_ENABLED=true
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - backend
+    networks:
+      - agentguard-network
+
 networks:
   agentguard-network:
     driver: bridge
@@ -90,3 +122,4 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  n8n_data:
