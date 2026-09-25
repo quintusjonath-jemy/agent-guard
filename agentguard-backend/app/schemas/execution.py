@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from app.core.permissions import ExecutionDecision, RiskLevel
 
 class ExecutionPipelineStep(BaseModel):
@@ -14,6 +14,19 @@ class ActionExecuteRequest(BaseModel):
     tool: str
     action: str
     payload: Dict[str, Any] = {}
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            values = dict(values)
+            if "tool" not in values and "tool_name" in values:
+                values["tool"] = values["tool_name"]
+            if "action" not in values and "action_name" in values:
+                values["action"] = values["action_name"]
+            if "payload" not in values and "request_payload" in values:
+                values["payload"] = values["request_payload"]
+        return values
 
 class ExecutionResponse(BaseModel):
     execution_id: int
