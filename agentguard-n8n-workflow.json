@@ -15,16 +15,10 @@
     },
     {
       "parameters": {
-        "authentication": "headerAuth",
-        "requestMethod": "POST",
+        "method": "POST",
         "url": "http://backend:8000/api/v1/execute",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
+        "authentication": "none",
+        "options": {},
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -39,26 +33,8 @@
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "agent_id",
-              "value": "={{ $json.body.agent_id || 1 }}"
-            },
-            {
-              "name": "tool_name",
-              "value": "={{ $json.body.tool_name }}"
-            },
-            {
-              "name": "action_name",
-              "value": "={{ $json.body.action_name }}"
-            },
-            {
-              "name": "request_payload",
-              "value": "={{ $json.body.payload }}"
-            }
-          ]
-        }
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ agent_id: ($json.body && $json.body.agent_id) ? $json.body.agent_id : ($json.agent_id || 2), tool: ($json.body && $json.body.tool_name) ? $json.body.tool_name : ($json.tool_name || $json.tool || 'customer.read'), action: ($json.body && $json.body.action_name) ? $json.body.action_name : ($json.action_name || $json.action || 'read'), payload: ($json.body && $json.body.payload) ? $json.body.payload : ($json.payload || {}) }) }}"
       },
       "id": "2",
       "name": "AgentGuard Security Firewall",
@@ -71,7 +47,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.decision }}",
+              "value1": "={{ $json.data.decision }}",
               "value2": "ALLOWED"
             }
           ]
@@ -86,7 +62,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, decision: $json.decision, tool_response: $json.tool_response, execution_id: $json.execution_id } }}"
+        "responseBody": "={{ { success: true, decision: $json.data.decision, tool_response: $json.data.response_payload, execution_id: $json.data.execution_id } }}"
       },
       "id": "4",
       "name": "Proceed With Action Result",
@@ -97,7 +73,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: false, decision: $json.decision, risk_score: $json.risk_score, reason: $json.reason, details: $json.plain_english_explanation } }}",
+        "responseBody": "={{ { success: false, decision: $json.data.decision, risk_score: $json.data.risk_score, reason: $json.data.reason } }}",
         "options": {
           "responseCode": 403
         }
