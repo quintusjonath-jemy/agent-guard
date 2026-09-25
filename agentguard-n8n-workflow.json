@@ -15,16 +15,10 @@
     },
     {
       "parameters": {
-        "authentication": "headerAuth",
-        "requestMethod": "POST",
+        "method": "POST",
         "url": "http://backend:8000/api/v1/execute",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "json"
-            }
-          }
-        },
+        "authentication": "none",
+        "options": {},
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -71,7 +65,7 @@
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.decision }}",
+              "value1": "={{ $json.data ? $json.data.decision : $json.decision }}",
               "value2": "ALLOWED"
             }
           ]
@@ -86,7 +80,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, decision: $json.decision, tool_response: $json.tool_response, execution_id: $json.execution_id } }}"
+        "responseBody": "={{ { success: true, decision: ($json.data ? $json.data.decision : $json.decision), tool_response: ($json.data ? $json.data.response_payload : $json.tool_response), execution_id: ($json.data ? $json.data.execution_id : $json.execution_id) } }}"
       },
       "id": "4",
       "name": "Proceed With Action Result",
@@ -97,7 +91,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: false, decision: $json.decision, risk_score: $json.risk_score, reason: $json.reason, details: $json.plain_english_explanation } }}",
+        "responseBody": "={{ { success: false, decision: ($json.data ? $json.data.decision : $json.decision), risk_score: ($json.data ? $json.data.risk_score : $json.risk_score), reason: ($json.data ? $json.data.reason : $json.reason) } }}",
         "options": {
           "responseCode": 403
         }
