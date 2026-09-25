@@ -2,106 +2,115 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bot,
-  ShieldAlert,
-  Activity,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
-  TrendingUp,
-  AlertTriangle,
-  Lock,
-  Radio,
-  Zap,
+  Bot, ShieldAlert, Activity, CheckCircle2,
+  ArrowRight, TrendingUp, AlertTriangle, Radio, Zap,
+  ShieldCheck, Eye, ChevronRight,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
 } from 'recharts';
 import apiClient from '../api/client';
-import { MetricCard } from '../components/MetricCard';
 import { SecurityScoreGauge } from '../components/SecurityScoreGauge';
 import { RiskBadge } from '../components/RiskBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { useWebSocket } from '../hooks/useWebSocket';
 
+// ── Stat Card ────────────────────────────────────────────────
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  sub: string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  trend?: string;
+  trendUp?: boolean;
+  alert?: boolean;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, sub, icon: Icon, iconBg, iconColor, trend, trendUp, alert }) => (
+  <div className={`glass-panel p-5 flex flex-col gap-4 ${alert ? 'ring-warn' : ''}`}>
+    <div className="flex items-start justify-between">
+      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center`}>
+        <Icon className={`w-5 h-5 ${iconColor}`} />
+      </div>
+      {trend && (
+        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+          trendUp === false
+            ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+            : trendUp === true
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            : 'bg-slate-800/60 text-slate-400 border border-white/[0.06]'
+        }`}>
+          {trend}
+        </span>
+      )}
+    </div>
+    <div>
+      <div className="text-2xl font-extrabold font-mono text-white tabular-nums">{value}</div>
+      <div className="text-xs text-slate-500 mt-0.5">{title}</div>
+      <div className="text-[10px] font-mono text-slate-600 mt-1">{sub}</div>
+    </div>
+  </div>
+);
+
+// ── Chart Tooltip ────────────────────────────────────────────
+const ChartTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="glass-panel-elevated px-3 py-2 text-[11px] font-mono">
+      <p className="text-slate-400 mb-1">{label}</p>
+      {payload.map((p: any) => (
+        <div key={p.name} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-slate-300">{p.name}:</span>
+          <span className="text-white font-semibold">{p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const DONUT_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
+
+// ── Dashboard ────────────────────────────────────────────────
 export const Dashboard: React.FC = () => {
   const [trendRange, setTrendRange] = useState<'24H' | '7D' | '30D'>('24H');
   const navigate = useNavigate();
   const { liveEvents } = useWebSocket();
 
-  // 1. Dashboard Stats Query
   const { data: statsData } = useQuery({
     queryKey: ['dashboard_stats'],
-    queryFn: async () => {
-      const res = await apiClient.get('/dashboard/stats');
-      return res.data.data;
-    },
+    queryFn: async () => (await apiClient.get('/dashboard/stats')).data.data,
     refetchInterval: 5000,
   });
 
-  // 2. Security Trends Query
   const { data: trendsData } = useQuery({
     queryKey: ['security_trends', trendRange],
-    queryFn: async () => {
-      const res = await apiClient.get(`/dashboard/security-trends?range_view=${trendRange}`);
-      return res.data.data;
-    },
+    queryFn: async () => (await apiClient.get(`/dashboard/security-trends?range_view=${trendRange}`)).data.data,
   });
 
-  // 3. Risk Distribution Query
   const { data: riskData } = useQuery({
     queryKey: ['risk_distribution'],
-    queryFn: async () => {
-      const res = await apiClient.get('/dashboard/risk-distribution');
-      return res.data.data;
-    },
+    queryFn: async () => (await apiClient.get('/dashboard/risk-distribution')).data.data,
   });
 
-  // 4. Risky Agents Leaderboard
   const { data: riskyAgents } = useQuery({
     queryKey: ['top_risky_agents'],
-    queryFn: async () => {
-      const res = await apiClient.get('/dashboard/top-risky-agents');
-      return res.data.data;
-    },
+    queryFn: async () => (await apiClient.get('/dashboard/top-risky-agents')).data.data,
   });
 
-  // 5. Heatmap Matrix
-  const { data: heatmapData } = useQuery({
-    queryKey: ['risk_heatmap'],
-    queryFn: async () => {
-      const res = await apiClient.get('/dashboard/risk-heatmap');
-      return res.data.data;
-    },
-  });
-
-  // 6. Pending Approvals
   const { data: pendingApprovals } = useQuery({
     queryKey: ['approvals_pending'],
-    queryFn: async () => {
-      const res = await apiClient.get('/approvals?status_filter=PENDING');
-      return res.data.data;
-    },
+    queryFn: async () => (await apiClient.get('/approvals?status_filter=PENDING')).data.data,
   });
 
   const stats = statsData || {
-    active_agents: 4,
-    actions_today: 4281,
-    blocked_today: 47,
-    pending_approvals: 3,
-    open_incidents: 2,
-    security_score: 96,
+    active_agents: 4, actions_today: 4281, blocked_today: 47,
+    pending_approvals: 3, open_incidents: 2, security_score: 96,
   };
 
-  const donutColors = ['#10b981', '#f59e0b', '#f97316', '#ef4444'];
   const pieData = riskData
     ? [
         { name: 'Low', value: riskData.low || 1 },
@@ -109,43 +118,47 @@ export const Dashboard: React.FC = () => {
         { name: 'High', value: riskData.high || 0 },
         { name: 'Critical', value: riskData.critical || 0 },
       ]
-    : [
-        { name: 'Low', value: 85 },
-        { name: 'Medium', value: 10 },
-        { name: 'High', value: 4 },
-        { name: 'Critical', value: 1 },
-      ];
+    : [{ name: 'Low', value: 85 }, { name: 'Medium', value: 10 }, { name: 'High', value: 4 }, { name: 'Critical', value: 1 }];
+
+  const totalEvents = pieData.reduce((a, c) => a + c.value, 0);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* 1. Header Greeting & Date */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+
+      {/* ── 1. Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-              Security Control Center
-            </h2>
-            <span className="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[10px] font-mono">
+          <div className="flex items-center gap-2.5">
+            <h2 className="text-xl font-extrabold text-white tracking-tight">Security Control Center</h2>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[10px] font-mono font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               LIVE SOC
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Real-time policy enforcement, AI agent governance, and threat mitigation.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => navigate('/live-monitor')}
+            className="btn-secondary text-[11px]"
+          >
+            <Radio className="w-3.5 h-3.5 text-cyan-400" />
+            Live Monitor
+          </button>
           <button
             onClick={() => navigate('/security-tests')}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold font-mono tracking-wide shadow-glow-teal transition-all"
+            className="btn-primary text-[11px]"
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>Launch Security Lab</span>
+            Security Lab
           </button>
         </div>
       </div>
 
-      {/* 2. Hero Security Score Gauge */}
+      {/* ── 2. Security Score Gauge ── */}
       <SecurityScoreGauge
         score={stats.security_score}
         activeAgents={stats.active_agents}
@@ -153,70 +166,75 @@ export const Dashboard: React.FC = () => {
         totalTools={10}
       />
 
-      {/* 3. Four Core Metric Cards */}
+      {/* ── 3. Stat Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Active Agents"
+        <StatCard
+          title="Active AI Agents"
           value={stats.active_agents}
-          subtext="Autonomous models governed"
+          sub="Autonomous models governed"
           icon={Bot}
+          iconBg="bg-cyan-500/10"
           iconColor="text-cyan-400"
           trend="+2 fleet"
+          trendUp={true}
         />
-        <MetricCard
+        <StatCard
           title="Actions Processed"
           value={stats.actions_today.toLocaleString()}
-          subtext="Today's total executions"
+          sub="Total executions today"
           icon={Activity}
-          iconColor="text-blue-400"
+          iconBg="bg-indigo-500/10"
+          iconColor="text-indigo-400"
           trend="+18% rate"
+          trendUp={true}
         />
-        <MetricCard
+        <StatCard
           title="Blocked Actions"
           value={stats.blocked_today}
-          subtext="Policy & permission violations"
+          sub="Policy & permission violations"
           icon={ShieldAlert}
+          iconBg="bg-red-500/10"
           iconColor="text-red-400"
-          trend="+7 today"
-          trendPositive={false}
-          highlight={stats.blocked_today > 0}
+          trend={`+7 today`}
+          trendUp={false}
+          alert={stats.blocked_today > 0}
         />
-        <MetricCard
+        <StatCard
           title="Pending Approvals"
           value={stats.pending_approvals}
-          subtext="Requires human authorization"
+          sub="Requires human authorization"
           icon={CheckCircle2}
+          iconBg="bg-amber-500/10"
           iconColor="text-amber-400"
           trend="Attention"
-          trendPositive={false}
-          highlight={stats.pending_approvals > 0}
+          trendUp={false}
+          alert={stats.pending_approvals > 0}
         />
       </div>
 
-      {/* 4. Two Column Layout: Security Activity Trends + Live Security Stream */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Security Activity Chart (2 cols) */}
+      {/* ── 4. Charts Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Activity Chart */}
         <div className="lg:col-span-2 glass-panel p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
-              <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+              <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-cyan-400" />
-                Security Activity Over Time
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Allowed executions vs blocked policy violations
-              </p>
+                <h3 className="text-sm font-bold text-white">Security Activity Trends</h3>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 font-mono">Allowed executions vs. blocked violations</p>
             </div>
 
-            <div className="inline-flex rounded-lg bg-dark-950 p-1 border border-slate-800 text-xs font-mono">
+            <div className="inline-flex rounded-xl bg-dark-900/80 p-1 border border-white/[0.05]">
               {(['24H', '7D', '30D'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => setTrendRange(r)}
-                  className={`px-3 py-1 rounded-md transition-all ${
+                  className={`px-3 py-1 rounded-lg text-[11px] font-mono transition-all ${
                     trendRange === r
-                      ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/25'
+                      : 'text-slate-500 hover:text-white'
                   }`}
                 >
                   {r}
@@ -225,273 +243,223 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendsData || []}>
+              <AreaChart data={trendsData || []} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
                 <defs>
-                  <linearGradient id="colorAllowed" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                  <linearGradient id="gradAllowed" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#10b981" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="colorBlocked" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
+                  <linearGradient id="gradBlocked" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#ef4444" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="timestamp" stroke="#64748b" fontSize={10} fontStyle="monospace" />
-                <YAxis stroke="#64748b" fontSize={10} fontStyle="monospace" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0a0d14',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    fontFamily: 'monospace',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="allowed"
-                  name="Allowed Actions"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorAllowed)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="blocked"
-                  name="Blocked Policy Violations"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorBlocked)"
-                />
+                <XAxis dataKey="timestamp" tick={{ fill: '#475569', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: '#475569', fontSize: 10, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Area type="monotone" dataKey="allowed" name="Allowed" stroke="#10b981" strokeWidth={2} fill="url(#gradAllowed)" />
+                <Area type="monotone" dataKey="blocked" name="Blocked" stroke="#ef4444" strokeWidth={2} fill="url(#gradBlocked)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-5 mt-3 pt-3 border-t border-white/[0.04]">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+              <span className="w-3 h-0.5 bg-emerald-400 rounded" />
+              Allowed Actions
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+              <span className="w-3 h-0.5 bg-red-400 rounded" />
+              Blocked Violations
+            </div>
+          </div>
         </div>
 
-        {/* Live Security Feed (1 col) */}
-        <div className="glass-panel p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
-                  <Radio className="w-4 h-4 text-cyan-400" />
-                  Live Security Stream
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">
-                WEBSOCKETS
+        {/* Live Security Feed */}
+        <div className="glass-panel p-5 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="relative flex">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping absolute opacity-75" />
+                <span className="w-2 h-2 rounded-full bg-cyan-400" />
               </span>
+              <h3 className="text-sm font-bold text-white">Live Security Stream</h3>
             </div>
+            <span className="section-label">WebSocket</span>
+          </div>
 
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-              {liveEvents.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500 font-mono border border-dashed border-slate-800 rounded-lg">
-                  Listening for agent actions...
+          <div className="flex-1 space-y-2 overflow-y-auto">
+            {liveEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-36 text-center">
+                <Radio className="w-6 h-6 text-slate-700 mb-2" />
+                <p className="text-[11px] font-mono text-slate-600">Listening for agent actions...</p>
+              </div>
+            ) : (
+              liveEvents.slice(0, 6).map((evt, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => evt.data.execution_id && navigate(`/executions/${evt.data.execution_id}`)}
+                  className="p-3 rounded-xl bg-dark-800/60 border border-white/[0.04] hover:border-white/[0.08] cursor-pointer transition-all group"
+                >
+                  <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 mb-1">
+                    <span className="font-semibold text-white text-xs">{evt.data.agent_name || 'Agent'}</span>
+                    <span>{evt.data.timestamp ? evt.data.timestamp.slice(11, 19) : 'Now'}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 truncate">{evt.data.action_name} via {evt.data.tool_name}</div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <StatusBadge status={evt.data.decision || 'PROCESSED'} />
+                    <span className="text-[10px] font-mono text-slate-600">Risk: {evt.data.risk_score ?? 0}</span>
+                  </div>
                 </div>
-              ) : (
-                liveEvents.slice(0, 5).map((evt, idx) => {
-                  const isBlocked = evt.data.decision === 'BLOCKED';
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => evt.data.execution_id && navigate(`/executions/${evt.data.execution_id}`)}
-                      className="p-3 rounded-lg bg-dark-950/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition-all text-left"
-                    >
-                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
-                        <span className="font-bold text-white">{evt.data.agent_name || 'Agent'}</span>
-                        <span>{evt.data.timestamp ? evt.data.timestamp.slice(11, 19) : 'Just now'}</span>
-                      </div>
-                      <div className="text-xs text-slate-300 font-medium truncate">
-                        {evt.data.action_name} ({evt.data.tool_name})
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/60">
-                        <StatusBadge status={evt.data.decision || 'PROCESSED'} />
-                        <span className="text-[10px] font-mono text-slate-400">
-                          Risk: {evt.data.risk_score || 0}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+              ))
+            )}
           </div>
 
           <button
             onClick={() => navigate('/live-monitor')}
-            className="w-full mt-4 py-2 rounded-lg bg-dark-950 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+            className="mt-3 w-full btn-secondary justify-center text-[11px] py-2"
           >
-            <span>Open Fullscreen Monitor</span>
+            Open Full Monitor
             <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
           </button>
         </div>
       </div>
 
-      {/* 5. Second Row: Donut Risk Distribution + Top Risky Agents Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Risk Distribution Donut (1 col) */}
-        <div className="glass-panel p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white tracking-tight mb-1">
-              Risk Level Distribution
-            </h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Categorized risk telemetry of agent actions
-            </p>
+      {/* ── 5. Risk + Agents Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-            <div className="h-48 w-full flex items-center justify-center relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={donutColors[index % donutColors.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0a0d14',
-                      borderColor: '#334155',
-                      borderRadius: '8px',
-                      fontSize: '11px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg font-bold font-mono text-white">
-                  {pieData.reduce((acc, curr) => acc + curr.value, 0)}
-                </span>
-                <span className="text-[9px] font-mono text-slate-400 uppercase">EVENTS</span>
-              </div>
+        {/* Donut Chart */}
+        <div className="glass-panel p-6">
+          <h3 className="text-sm font-bold text-white mb-0.5">Risk Distribution</h3>
+          <p className="text-[11px] font-mono text-slate-500 mb-4">Categorized agent action telemetry</p>
+
+          <div className="relative h-44 flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={70} paddingAngle={3} dataKey="value" stroke="none">
+                  {pieData.map((_, i) => (
+                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ChartTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute text-center pointer-events-none">
+              <div className="text-xl font-extrabold font-mono text-white">{totalEvents}</div>
+              <div className="text-[9px] font-mono text-slate-500 uppercase tracking-wide">Total</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-800/80 text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span className="text-slate-400">LOW</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-              <span className="text-slate-400">MEDIUM</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-              <span className="text-slate-400">HIGH</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-400"></span>
-              <span className="text-slate-400">CRITICAL</span>
-            </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 pt-4 border-t border-white/[0.04]">
+            {[
+              { label: 'LOW',      color: 'bg-emerald-400', val: pieData[0].value },
+              { label: 'MEDIUM',   color: 'bg-amber-400',   val: pieData[1].value },
+              { label: 'HIGH',     color: 'bg-orange-400',  val: pieData[2].value },
+              { label: 'CRITICAL', color: 'bg-red-400',     val: pieData[3].value },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                  {item.label}
+                </div>
+                <span className="text-slate-300 font-semibold">{item.val}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Top Risky Agents Leaderboard (2 cols) */}
+        {/* Risky Agents Table */}
         <div className="lg:col-span-2 glass-panel p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-white tracking-tight">
-                Agents Requiring Attention
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Anomaly tracking and blocked action telemetry per agent
-              </p>
+              <h3 className="text-sm font-bold text-white">Agents Requiring Attention</h3>
+              <p className="text-[11px] font-mono text-slate-500 mt-0.5">Blocked action telemetry per registered agent</p>
             </div>
             <button
               onClick={() => navigate('/agents')}
-              className="text-xs font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+              className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors"
             >
-              View Fleet →
+              View Fleet <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-slate-800 text-[10px] font-mono uppercase tracking-wider text-slate-500">
-                  <th className="py-2.5 px-3">Agent</th>
-                  <th className="py-2.5 px-3">Risk Level</th>
-                  <th className="py-2.5 px-3">Blocked Actions</th>
-                  <th className="py-2.5 px-3">Security Score</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                <tr className="border-b border-white/[0.05]">
+                  {['Agent', 'Risk', 'Blocked', 'Score', 'Status', ''].map((h) => (
+                    <th key={h} className="py-2 px-2.5 section-label">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-xs">
+              <tbody>
                 {(riskyAgents || []).map((agent: any) => (
-                  <tr key={agent.agent_id} className="hover:bg-dark-850/60 transition-colors">
-                    <td className="py-3 px-3 font-semibold text-white flex items-center gap-2">
-                      <Bot className="w-4 h-4 text-cyan-400" />
-                      <span>{agent.agent_name}</span>
+                  <tr key={agent.agent_id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3 px-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-dark-700 border border-white/[0.06] flex items-center justify-center">
+                          <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                        </div>
+                        <span className="text-xs font-semibold text-white">{agent.agent_name}</span>
+                      </div>
                     </td>
-                    <td className="py-3 px-3">
-                      <RiskBadge level={agent.risk_level} size="sm" />
-                    </td>
-                    <td className="py-3 px-3 font-mono text-red-400 font-medium">
-                      {agent.blocked_actions} blocked
-                    </td>
-                    <td className="py-3 px-3 font-mono font-bold text-slate-200">
-                      {agent.security_score} / 100
-                    </td>
-                    <td className="py-3 px-3">
-                      <StatusBadge status={agent.status} />
-                    </td>
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-3 px-2.5"><RiskBadge level={agent.risk_level} size="sm" /></td>
+                    <td className="py-3 px-2.5 font-mono text-xs text-red-400 font-semibold">{agent.blocked_actions}</td>
+                    <td className="py-3 px-2.5 font-mono text-xs text-slate-200 font-bold">{agent.security_score}/100</td>
+                    <td className="py-3 px-2.5"><StatusBadge status={agent.status} /></td>
+                    <td className="py-3 px-2.5 text-right">
                       <button
                         onClick={() => navigate(`/agents/${agent.agent_id}`)}
-                        className="text-xs text-cyan-400 hover:underline font-mono"
+                        className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors"
                       >
-                        Inspect →
+                        <Eye className="w-3 h-3" /> Inspect
                       </button>
                     </td>
                   </tr>
                 ))}
+                {(!riskyAgents || riskyAgents.length === 0) && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center">
+                      <ShieldCheck className="w-8 h-8 text-emerald-400/30 mx-auto mb-2" />
+                      <p className="text-xs font-mono text-slate-600">All agents operating within policy bounds</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* 6. Pending Approvals Quick Review Bar */}
+      {/* ── 6. Pending Approvals Alert ── */}
       {pendingApprovals && pendingApprovals.length > 0 && (
-        <div className="glass-panel-elevated p-6 border-amber-500/30 bg-amber-950/20 shadow-glow-amber">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-white tracking-tight">
-                  High-Risk Actions Require Human Approval ({pendingApprovals.length})
-                </h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Autonomous agents have requested operations that exceed automated policy limits.
-                </p>
-              </div>
+        <div className="glass-panel-warn p-5 ring-warn flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 text-amber-400" />
             </div>
-
-            <button
-              onClick={() => navigate('/approvals')}
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-dark-950 font-bold text-xs font-mono tracking-wide shadow-md transition-all shrink-0"
-            >
-              Open Approval Inbox ({pendingApprovals.length})
-            </button>
+            <div>
+              <h4 className="text-sm font-bold text-white">
+                {pendingApprovals.length} High-Risk Action{pendingApprovals.length > 1 ? 's' : ''} Require Human Approval
+              </h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Autonomous agents have requested operations exceeding automated policy limits.
+              </p>
+            </div>
           </div>
+          <button
+            onClick={() => navigate('/approvals')}
+            className="btn-primary shrink-0 bg-amber-500 hover:bg-amber-400 text-dark-950 shadow-glow-amber"
+          >
+            Review Approval Inbox
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
+
     </div>
   );
 };
