@@ -10,13 +10,15 @@ export const Approvals: React.FC = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['approvals'],
-    queryFn: () => apiClient.get('/approvals?status=PENDING&limit=50').then(r => r.data.data),
+    queryFn: () => apiClient.get('/approvals?status_filter=PENDING&limit=50').then(r => r.data.data),
     refetchInterval: 10000,
   });
 
   const decide = useMutation({
-    mutationFn: ({ id, decision, note }: { id: number; decision: string; note: string }) =>
-      apiClient.post(`/approvals/${id}/decide`, { decision, notes: note }),
+    mutationFn: ({ id, decision, note }: { id: number; decision: string; note: string }) => {
+      const endpoint = decision === 'APPROVED' ? `/approvals/${id}/approve` : `/approvals/${id}/reject`;
+      return apiClient.post(endpoint, { decision_notes: note });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['approvals'] }),
   });
 

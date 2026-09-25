@@ -78,9 +78,9 @@ export const Dashboard: React.FC = () => {
 
   const { data: stats }       = useQuery({ queryKey: ['dashboard_stats'], queryFn: () => apiClient.get('/dashboard/stats').then(r => r.data.data), refetchInterval: 30000 });
   const { data: trends }      = useQuery({ queryKey: ['security_trends', range], queryFn: () => apiClient.get(`/dashboard/security-trends?range=${range}`).then(r => r.data.data), refetchInterval: 60000 });
-  const { data: approvals }   = useQuery({ queryKey: ['approvals'], queryFn: () => apiClient.get('/approvals?status=PENDING&limit=3').then(r => r.data.data) });
+  const { data: approvals }   = useQuery({ queryKey: ['approvals'], queryFn: () => apiClient.get('/approvals?status_filter=PENDING&limit=3').then(r => r.data.data) });
   const { data: agents }      = useQuery({ queryKey: ['agents'], queryFn: () => apiClient.get('/agents').then(r => r.data.data) });
-  const { data: incidents }   = useQuery({ queryKey: ['incidents'], queryFn: () => apiClient.get('/incidents?status=OPEN&limit=3').then(r => r.data.data) });
+  const { data: incidents }   = useQuery({ queryKey: ['incidents'], queryFn: () => apiClient.get('/incidents?status_filter=OPEN&limit=3').then(r => r.data.data) });
 
   const now = new Date();
   const hour = now.getHours();
