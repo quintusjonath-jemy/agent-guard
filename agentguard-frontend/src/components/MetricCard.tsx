@@ -1,64 +1,30 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
 
-interface MetricCardProps {
+interface Props {
   title: string;
   value: string | number;
-  subtext?: string;
-  icon: LucideIcon;
-  iconColor?: string;
+  sub?: string;
+  icon: React.ElementType;
+  accent?: 'green' | 'red' | 'yellow' | 'default';
   trend?: string;
-  trendPositive?: boolean;
-  highlight?: boolean;
+  trendUp?: boolean;
 }
 
-export const MetricCard: React.FC<MetricCardProps> = ({
-  title,
-  value,
-  subtext,
-  icon: Icon,
-  iconColor = 'text-cyan-400',
-  trend,
-  trendPositive = true,
-  highlight = false,
-}) => {
+export const MetricCard: React.FC<Props> = ({ title, value, sub, icon: Icon, accent = 'default', trend, trendUp }) => {
+  const accentColor = accent === 'green' ? '#35B77A' : accent === 'red' ? '#F04444' : accent === 'yellow' ? '#D6A84F' : '#A1A1A1';
   return (
-    <div
-      className={`p-5 rounded-xl border transition-all duration-200 ${
-        highlight
-          ? 'bg-dark-850/90 border-cyan-500/30 shadow-glow-teal'
-          : 'bg-dark-900/80 border-slate-800 hover:border-slate-700'
-      }`}
-    >
+    <div className="card p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider font-mono">
-          {title}
-        </span>
-        <div className={`p-2 rounded-lg bg-dark-950/70 border border-slate-800/80 ${iconColor}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-      </div>
-
-      <div className="flex items-baseline justify-between">
-        <div className="text-2xl font-bold font-mono text-white tracking-tight">
-          {value}
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${accentColor}14` }}>
+          <Icon className="w-4 h-4" style={{ color: accentColor }} />
         </div>
         {trend && (
-          <span
-            className={`text-xs font-mono font-medium ${
-              trendPositive ? 'text-emerald-400' : 'text-amber-400'
-            }`}
-          >
-            {trend}
-          </span>
+          <span className={`text-[11px] font-mono ${trendUp ? 'text-success' : 'text-danger'}`}>{trend}</span>
         )}
       </div>
-
-      {subtext && (
-        <p className="mt-1 text-xs text-slate-500 truncate">
-          {subtext}
-        </p>
-      )}
+      <div className="text-[28px] font-bold text-[#F5F5F5] font-mono tabular-nums leading-none">{value}</div>
+      <div className="text-[12px] text-[#A1A1A1] mt-1">{title}</div>
+      {sub && <div className="text-[11px] text-[#6F6F6F] font-mono mt-0.5">{sub}</div>}
     </div>
   );
 };
