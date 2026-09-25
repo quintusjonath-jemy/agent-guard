@@ -1,215 +1,125 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Key, Plus, Trash2, Copy, Check, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import apiClient from '../api/client';
-import { APIKey } from '../types';
-import { StatusBadge } from '../components/StatusBadge';
 
 export const ApiKeys: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [keyName, setKeyName] = useState('');
-  const [newKeyData, setNewKeyData] = useState<any>(null);
-  const [copied, setCopied] = useState(false);
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [visible, setVisible] = useState<Record<number, boolean>>({});
+  const [copied, setCopied] = useState<number | null>(null);
 
-  const queryClient = useQueryClient();
-
-  const { data: apiKeys, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['api_keys'],
-    queryFn: async () => {
-      const res = await apiClient.get('/api-keys');
-      return res.data.data as APIKey[];
-    },
+    queryFn: () => apiClient.get('/api-keys').then(r => r.data.data),
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await apiClient.post('/api-keys', { name });
-      return res.data.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['api_keys'] });
-      setNewKeyData(data);
-      setKeyName('');
-    },
+  const create = useMutation({
+    mutationFn: (n: string) => apiClient.post('/api-keys', { name: n }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['api_keys'] }); setName(''); setCreating(false); },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiClient.delete(`/api-keys/${id}`);
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['api_keys'] });
-    },
+  const del = useMutation({
+    mutationFn: (id: number) => apiClient.delete(`/api-keys/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['api_keys'] }),
   });
 
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate(keyName);
+  const keys = Array.isArray(data) ? data : (data?.items ?? []);
+
+  const copyKey = (id: number, key: string) => {
+    navigator.clipboard.writeText(key);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const handleCopySecret = () => {
-    if (newKeyData?.api_key) {
-      navigator.clipboard.writeText(newKeyData.api_key);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
+  const fmt = (ts: string) => ts ? new Date(ts).toLocaleDateString() : '—';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-6 max-w-[800px] mx-auto animate-fade-in">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Developer API Key Management
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Authenticate autonomous AI agent scripts, LangChain agents, and n8n webhooks through the AgentGuard Gateway.
-          </p>
+          <h1 className="text-[22px] font-semibold text-[#F5F5F5]">API Keys</h1>
+          <p className="text-[13px] text-[#6F6F6F] mt-1">Manage authentication credentials for AgentGuard gateway</p>
         </div>
-
-        <button
-          onClick={() => {
-            setIsModalOpen(true);
-            setNewKeyData(null);
-          }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold font-mono tracking-wide shadow-glow-teal transition-all"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Create New API Key</span>
+        <button onClick={() => setCreating(c => !c)} className="btn-primary btn-sm">
+          <Plus className="w-3.5 h-3.5" /> Create Key
         </button>
       </div>
 
-      {/* Keys Table */}
-      <div className="glass-panel overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse font-mono text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 bg-dark-950/60">
-                <th className="py-3 px-4">Key Name</th>
-                <th className="py-3 px-4">Prefix</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Created</th>
-                <th className="py-3 px-4">Last Used</th>
-                <th className="py-3 px-4 text-right">Revoke</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {(apiKeys || []).length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    No active API keys found. Generate one to connect your external AI agent.
-                  </td>
-                </tr>
-              ) : (
-                apiKeys?.map((k) => (
-                  <tr key={k.id} className="hover:bg-dark-850/60 transition-colors">
-                    <td className="py-3 px-4 font-bold text-white">
-                      {k.name}
-                    </td>
-                    <td className="py-3 px-4 text-cyan-400">
-                      <code>{k.prefix}••••••••••••</code>
-                    </td>
-                    <td className="py-3 px-4">
-                      <StatusBadge status={k.is_active ? 'ACTIVE' : 'REVOKED'} />
-                    </td>
-                    <td className="py-3 px-4 text-slate-400 text-[11px]">
-                      {new Date(k.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 text-[11px]">
-                      {k.last_used_at ? new Date(k.last_used_at).toLocaleTimeString() : 'Never'}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => deleteMutation.mutate(k.id)}
-                        className="p-1.5 rounded bg-dark-950 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors"
-                        title="Revoke Key"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Create Key Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-panel-elevated p-6 border-slate-700 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-white tracking-tight">
-              {newKeyData ? 'Save Your API Key Secret' : 'Create Agent API Key'}
-            </h3>
-
-            {!newKeyData ? (
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                    Key Description Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. n8n Production Workflow Agent"
-                    value={keyName}
-                    onChange={(e) => setKeyName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-lg bg-dark-900 border border-slate-800 text-xs font-mono text-slate-400 hover:text-white"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={createMutation.isPending}
-                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold"
-                  >
-                    {createMutation.isPending ? 'Generating...' : 'Generate Key'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4 animate-in fade-in">
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    Store this key securely now. For security purposes, this secret key will never be displayed again.
-                  </span>
-                </div>
-
-                <div className="p-3 rounded-lg bg-dark-950 border border-slate-800 flex items-center justify-between gap-3">
-                  <code className="text-xs font-mono text-cyan-300 break-all select-all">
-                    {newKeyData.api_key}
-                  </code>
-                  <button
-                    onClick={handleCopySecret}
-                    className="p-2 rounded bg-dark-900 hover:bg-dark-850 text-slate-300 hover:text-white border border-slate-800 shrink-0"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold"
-                  >
-                    Done & Saved
-                  </button>
-                </div>
-              </div>
-            )}
+      {/* Create form */}
+      {creating && (
+        <div className="card p-5 mb-5 animate-slide-down">
+          <h2 className="text-[14px] font-semibold text-[#F5F5F5] mb-4">New API Key</h2>
+          <div className="flex gap-3">
+            <input
+              className="input-field flex-1"
+              placeholder="Key name (e.g. Production Agent)"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && name.trim() && create.mutate(name.trim())}
+              autoFocus
+            />
+            <button
+              className="btn-primary btn-sm"
+              disabled={!name.trim() || create.isPending}
+              onClick={() => create.mutate(name.trim())}
+            >
+              Generate
+            </button>
+            <button className="btn-secondary btn-sm" onClick={() => setCreating(false)}>Cancel</button>
           </div>
+        </div>
+      )}
+
+      {/* Keys list */}
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="card h-20 p-5"><div className="skeleton h-full" /></div>)}</div>
+      ) : keys.length === 0 ? (
+        <div className="card flex flex-col items-center justify-center py-20 text-center">
+          <Key className="w-8 h-8 text-[#2A2A2A] mb-3" />
+          <p className="text-[14px] text-[#6F6F6F]">No API keys</p>
+          <p className="text-[12px] text-[#6F6F6F] mt-1 mb-4">Create an API key to allow agents to authenticate</p>
+          <button onClick={() => setCreating(true)} className="btn-primary btn-sm"><Plus className="w-3.5 h-3.5" /> Create Key</button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {keys.map((k: any) => (
+            <div key={k.id} className="card p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[14px] font-medium text-[#F5F5F5]">{k.name}</span>
+                    <span className={`badge ${k.is_active ? 'badge-active' : 'badge-inactive'}`}>{k.is_active ? 'Active' : 'Inactive'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="text-[12px] font-mono text-[#6F6F6F] bg-[#1A1A1A] px-3 py-1.5 rounded-md border border-[#2A2A2A] flex-1 min-w-0 truncate">
+                      {visible[k.id] ? (k.key_value || k.api_key || '••••••••••••••••') : '••••••••••••••••••••••••••••••••'}
+                    </code>
+                    <button
+                      onClick={() => setVisible(v => ({ ...v, [k.id]: !v[k.id] }))}
+                      className="btn-ghost btn-xs"
+                    >
+                      {visible[k.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => copyKey(k.id, k.key_value || k.api_key || '')}
+                      className="btn-ghost btn-xs"
+                    >
+                      {copied === k.id ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <div className="text-[11px] text-[#6F6F6F] font-mono mt-1.5">Created {fmt(k.created_at)} · Last used {fmt(k.last_used_at)}</div>
+                </div>
+                <button
+                  onClick={() => { if (confirm('Delete this API key?')) del.mutate(k.id); }}
+                  className="btn-danger btn-xs flex-shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

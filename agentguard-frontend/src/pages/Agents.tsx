@@ -1,224 +1,114 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Plus, ArrowRight, Shield, Lock, Wrench, Activity, CheckCircle2 } from 'lucide-react';
+import { Bot, Plus, Search, ChevronRight, Activity, Shield } from 'lucide-react';
 import apiClient from '../api/client';
-import { Agent } from '../types';
 import { RiskBadge } from '../components/RiskBadge';
 import { StatusBadge } from '../components/StatusBadge';
 
 export const Agents: React.FC = () => {
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [provider, setProvider] = useState('OpenAI GPT-4');
-  const [environment, setEnvironment] = useState('Production');
-  const [riskLevel, setRiskLevel] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('LOW');
-
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-
-  const { data: agents, isLoading } = useQuery({
+  const [search, setSearch] = useState('');
+  const { data, isLoading } = useQuery({
     queryKey: ['agents'],
-    queryFn: async () => {
-      const res = await apiClient.get('/agents');
-      return res.data.data as Agent[];
-    },
+    queryFn: () => apiClient.get('/agents').then(r => r.data.data),
   });
 
-  const createMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const res = await apiClient.post('/agents', payload);
-      return res.data.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      setIsCreateModalOpen(false);
-      setName('');
-      setDescription('');
-    },
-  });
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({
-      name,
-      description,
-      provider,
-      environment,
-      risk_level: riskLevel,
-      status: 'ACTIVE',
-    });
-  };
+  const agents = Array.isArray(data) ? data : (data?.items ?? []);
+  const filtered = agents.filter((a: any) =>
+    a.name.toLowerCase().includes(search.toLowerCase()) ||
+    a.provider?.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="p-6 max-w-[1200px] mx-auto animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">
-            Autonomous AI Agent Fleet
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Governed AI models with deterministic tool permissions, financial thresholds, and policy boundaries.
-          </p>
+          <h1 className="text-[22px] font-semibold text-[#F5F5F5]">AI Agents</h1>
+          <p className="text-[13px] text-[#6F6F6F] mt-1">{agents.length} registered agents</p>
         </div>
-
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold font-mono tracking-wide shadow-glow-teal transition-all"
-        >
+        <button onClick={() => navigate('/agents/new')} className="btn-primary btn-sm">
           <Plus className="w-3.5 h-3.5" />
-          <span>Register AI Agent</span>
+          Register Agent
         </button>
       </div>
 
-      {/* Agents Card Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {(agents || []).map((agent) => (
-          <div
-            key={agent.id}
-            onClick={() => navigate(`/agents/${agent.id}`)}
-            className="glass-panel p-6 hover:border-cyan-500/40 hover:bg-dark-850/80 cursor-pointer transition-all duration-200 flex flex-col justify-between group"
-          >
-            <div>
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 group-hover:shadow-glow-teal transition-all">
-                    <Bot className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white tracking-tight group-hover:text-cyan-300 transition-colors">
-                      {agent.name}
-                    </h3>
-                    <span className="text-[11px] font-mono text-slate-400">
-                      {agent.provider} • {agent.environment}
-                    </span>
-                  </div>
-                </div>
-                <StatusBadge status={agent.status} />
-              </div>
-
-              <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 mb-4">
-                {agent.description || 'Autonomous agent performing governed operations.'}
-              </p>
-
-              <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-800/80 text-center font-mono">
-                <div className="bg-dark-950/60 p-2 rounded border border-slate-800/60">
-                  <div className="text-[10px] text-slate-500 uppercase">SCORE</div>
-                  <div className="text-sm font-bold text-emerald-400">{agent.security_score}</div>
-                </div>
-                <div className="bg-dark-950/60 p-2 rounded border border-slate-800/60">
-                  <div className="text-[10px] text-slate-500 uppercase">TOOLS</div>
-                  <div className="text-sm font-bold text-cyan-400">{agent.tools_count || 0}</div>
-                </div>
-                <div className="bg-dark-950/60 p-2 rounded border border-slate-800/60">
-                  <div className="text-[10px] text-slate-500 uppercase">RISK</div>
-                  <div className="text-xs font-bold text-slate-300 mt-0.5">{agent.risk_level}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-4 pt-2 text-xs font-mono text-cyan-400 group-hover:text-cyan-300">
-              <RiskBadge level={agent.risk_level} size="sm" />
-              <span className="flex items-center gap-1">
-                Configure Agent <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-              </span>
-            </div>
-          </div>
-        ))}
+      {/* Search */}
+      <div className="relative mb-5">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6F6F6F]" />
+        <input
+          className="input-field pl-9"
+          placeholder="Search agents..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
       </div>
 
-      {/* Create Agent Modal */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-dark-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass-panel-elevated p-6 border-slate-700 shadow-2xl">
-            <h3 className="text-base font-bold text-white tracking-tight mb-1">
-              Register New Autonomous Agent
-            </h3>
-            <p className="text-xs text-slate-400 mb-5">
-              Define the AI agent identity, LLM provider, and default operational risk boundary.
-            </p>
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                  Agent Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. BillingAuditorBot"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                  Description & Purpose
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Briefly describe what tasks this autonomous agent is authorized to perform..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                    LLM Provider
-                  </label>
-                  <select
-                    value={provider}
-                    onChange={(e) => setProvider(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  >
-                    <option value="OpenAI GPT-4">OpenAI GPT-4</option>
-                    <option value="Anthropic Claude 3.5 Sonnet">Claude 3.5 Sonnet</option>
-                    <option value="Google Gemini 1.5 Pro">Gemini 1.5 Pro</option>
-                    <option value="Custom LangChain Agent">Custom LangChain</option>
-                  </select>
+      {/* Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="card p-5 h-[180px]">
+              <div className="skeleton w-8 h-8 rounded-lg mb-3" />
+              <div className="skeleton w-32 h-4 mb-2" />
+              <div className="skeleton w-48 h-3" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card flex flex-col items-center justify-center py-20 text-center">
+          <Bot className="w-10 h-10 text-[#2A2A2A] mb-3" />
+          <p className="text-[14px] text-[#6F6F6F]">No agents found</p>
+          <p className="text-[12px] text-[#6F6F6F] mt-1 mb-4">Register your first AI agent to get started</p>
+          <button onClick={() => navigate('/agents/new')} className="btn-primary btn-sm">
+            <Plus className="w-3.5 h-3.5" /> Register Agent
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((agent: any) => (
+            <div
+              key={agent.id}
+              className="card-interactive p-5"
+              onClick={() => navigate(`/agents/${agent.id}`)}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-9 h-9 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-[#A1A1A1]" />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                    Environment
-                  </label>
-                  <select
-                    value={environment}
-                    onChange={(e) => setEnvironment(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-dark-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono"
-                  >
-                    <option value="Production">Production</option>
-                    <option value="Staging">Staging</option>
-                    <option value="Development">Development</option>
-                  </select>
+                <div className="flex items-center gap-1.5">
+                  <StatusBadge status={agent.status} />
+                  <RiskBadge level={agent.risk_level} />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-dark-900 border border-slate-800 text-xs font-mono text-slate-400 hover:text-white"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-semibold shadow-glow-teal"
-                >
-                  {createMutation.isPending ? 'Registering...' : 'Register Agent'}
-                </button>
+              <h3 className="text-[14px] font-semibold text-[#F5F5F5] mb-0.5">{agent.name}</h3>
+              <p className="text-[12px] text-[#6F6F6F] truncate-2 leading-relaxed mb-4">{agent.description}</p>
+
+              <div className="grid grid-cols-3 gap-2 border-t border-[#2A2A2A] pt-3">
+                <div className="text-center">
+                  <div className="text-[14px] font-semibold font-mono text-[#F5F5F5]">{agent.security_score ?? '—'}</div>
+                  <div className="text-[10px] text-[#6F6F6F]">Score</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[14px] font-semibold font-mono text-[#F5F5F5]">{agent.total_executions ?? 0}</div>
+                  <div className="text-[10px] text-[#6F6F6F]">Actions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[14px] font-semibold font-mono text-[#F5F5F5]">{agent.blocked_executions ?? 0}</div>
+                  <div className="text-[10px] text-[#6F6F6F]">Blocked</div>
+                </div>
               </div>
-            </form>
-          </div>
+
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#2A2A2A]">
+                <span className="text-[11px] font-mono text-[#6F6F6F]">{agent.provider}</span>
+                <span className="text-[11px] text-brand flex items-center gap-0.5">
+                  View <ChevronRight className="w-3 h-3" />
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

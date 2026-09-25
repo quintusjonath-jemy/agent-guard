@@ -1,165 +1,101 @@
-import React, { useState } from 'react';
-import { Workflow, Bot, Check, Copy, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Plug, ExternalLink, CheckCircle2, XCircle, Copy, Check } from 'lucide-react';
+import apiClient from '../api/client';
+import { useState } from 'react';
+
+const INTEGRATIONS = [
+  { id: 'n8n', name: 'n8n Workflow Automation', desc: 'Connect AI agents through n8n workflows via the AgentGuard webhook gateway.', status: 'connected', url: 'http://localhost:5678', docs: 'https://n8n.io' },
+  { id: 'openai', name: 'OpenAI API', desc: 'Monitor and govern OpenAI API calls made by registered agents.', status: 'available', url: null, docs: 'https://platform.openai.com' },
+  { id: 'anthropic', name: 'Anthropic Claude', desc: 'Governance layer for Claude-powered agents.', status: 'available', url: null, docs: 'https://anthropic.com' },
+];
 
 export const Integrations: React.FC = () => {
-  const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  const samplePythonSnippet = `import requests
+  const { data } = useQuery({
+    queryKey: ['integrations_status'],
+    queryFn: () => apiClient.get('/health').then(r => r.data).catch(() => null),
+  });
 
-# 1. External AI Agent sends action through AgentGuard Gateway
-response = requests.post(
-    "http://localhost:8000/api/v1/execute",
-    headers={"X-API-Key": "ag_live_your_generated_secret_key"},
-    json={
-        "agent_id": 1,
-        "tool": "refund_customer",
-        "action": "refund",
-        "payload": {
-            "customer_id": 381,
-            "amount": 8500.0  # Safe <= ₹10,000 threshold
-        }
-    }
-)
+  const webhookUrl = `${window.location.origin}/api/v1/execute`;
 
-result = response.json()
-print("AgentGuard Decision:", result["data"]["decision"])
-print("Execution Result:", result["data"]["response_payload"])`;
-
-  const sampleN8nNode = `{
-  "nodes": [
-    {
-      "parameters": {
-        "url": "http://backend:8000/api/v1/execute",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-API-Key",
-              "value": "ag_live_your_agentguard_key"
-            }
-          ]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "agent_id", "value": "={{$json.agent_id}}" },
-            { "name": "tool", "value": "={{$json.tool_name}}" },
-            { "name": "action", "value": "={{$json.action}}" },
-            { "name": "payload", "value": "={{$json.tool_payload}}" }
-          ]
-        }
-      },
-      "name": "AgentGuard Security Firewall",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2
-    }
-  ]
-}`;
-
-  const copyToClipboard = (text: string, section: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSection(section);
-    setTimeout(() => setCopiedSection(null), 2000);
+  const copyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 max-w-5xl mx-auto">
-      {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">
-          Integrations & Autonomous Workflow Bridge
-        </h2>
-        <p className="text-xs text-slate-400 mt-1">
-          Connect n8n autonomous workflows, LangChain agents, or Python services to the AgentGuard security proxy.
-        </p>
+    <div className="p-6 max-w-[900px] mx-auto animate-fade-in">
+      <div className="mb-6">
+        <h1 className="text-[22px] font-semibold text-[#F5F5F5]">Integrations</h1>
+        <p className="text-[13px] text-[#6F6F6F] mt-1">Connect AgentGuard to your AI infrastructure</p>
       </div>
 
-      {/* Architecture Visual Diagram Card */}
-      <div className="glass-panel p-6 border-cyan-500/20 bg-cyan-950/10">
-        <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-2">
-          <ShieldCheck className="w-4 h-4" />
-          <span>Governance Architecture Pipeline</span>
-        </div>
-        <div className="p-4 rounded-lg bg-dark-950/80 border border-slate-800 font-mono text-xs text-slate-300 overflow-x-auto whitespace-pre leading-relaxed">
-{`n8n AI Agent / Script 
-      ↓  (POST /api/v1/execute with X-API-Key)
-AgentGuard Core Gateway
-      ↓
-Authentication → Agent Check → Tool Validation → DLP Scanner → Policy Engine → Risk Engine
-      ↓
-Decision:
- ┌───────────────────────┬───────────────────────┐
- │ ALLOWED               │ PENDING_APPROVAL      │ BLOCKED
- ↓                       ↓                       ↓
-Safe Mock Tool Execution  Supervisor Inbox Alert   Immutable SOC Incident Log`}
-        </div>
-      </div>
-
-      {/* Integration Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Card 1: n8n Workflow Node */}
-        <div className="glass-panel p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 rounded-xl bg-orange-950/60 border border-orange-500/30 text-orange-400">
-                <Workflow className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">n8n Workflow Node</h3>
-                <span className="text-[10px] font-mono text-emerald-400">READY TO IMPORT</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              Place the AgentGuard HTTP Request node directly before any tool or database step in your n8n canvas.
-            </p>
-
-            <pre className="code-box max-h-48 overflow-auto text-[11px]">
-              {sampleN8nNode}
-            </pre>
-          </div>
-
-          <button
-            onClick={() => copyToClipboard(sampleN8nNode, 'n8n')}
-            className="mt-4 w-full py-2 rounded-lg bg-dark-950 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
-          >
-            {copiedSection === 'n8n' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{copiedSection === 'n8n' ? 'Copied JSON!' : 'Copy n8n Node JSON'}</span>
+      {/* Webhook endpoint */}
+      <div className="card p-6 mb-6">
+        <h2 className="text-[14px] font-semibold text-[#F5F5F5] mb-1">Gateway Endpoint</h2>
+        <p className="text-[13px] text-[#6F6F6F] mb-4">Point your agents or orchestration system to this URL to enable security enforcement.</p>
+        <div className="flex items-center gap-2">
+          <div className="code-block flex-1 text-[12px] py-2.5">{webhookUrl}</div>
+          <button onClick={copyWebhook} className="btn-secondary btn-sm flex-shrink-0">
+            {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
 
-        {/* Card 2: Python SDK / LangChain */}
-        <div className="glass-panel p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2.5 rounded-xl bg-cyan-950/60 border border-cyan-500/30 text-cyan-400">
-                <Bot className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Python / LangChain Agent</h3>
-                <span className="text-[10px] font-mono text-cyan-400">REST API CLIENT</span>
-              </div>
-            </div>
+        <div className="mt-5 p-4 bg-[#1A1A1A] rounded-lg border border-[#2A2A2A]">
+          <p className="text-[12px] text-[#6F6F6F] mb-3 font-semibold uppercase tracking-wide">Example Request</p>
+          <pre className="code-block text-[11px] overflow-auto">
+{`POST ${webhookUrl}
+X-API-Key: your-api-key
+Content-Type: application/json
 
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-              Wrap your tool calls with the AgentGuard client to ensure every action is independently validated.
-            </p>
-
-            <pre className="code-box max-h-48 overflow-auto text-[11px]">
-              {samplePythonSnippet}
-            </pre>
-          </div>
-
-          <button
-            onClick={() => copyToClipboard(samplePythonSnippet, 'python')}
-            className="mt-4 w-full py-2 rounded-lg bg-dark-950 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-colors"
-          >
-            {copiedSection === 'python' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-cyan-400" />}
-            <span>{copiedSection === 'python' ? 'Copied Code!' : 'Copy Python Snippet'}</span>
-          </button>
+{
+  "agent_id": 1,
+  "tool": "customer.database",
+  "action": "read",
+  "payload": { "customer_id": "cust_101" }
+}`}</pre>
         </div>
+      </div>
+
+      {/* Connected integrations */}
+      <div className="grid grid-cols-1 gap-4">
+        {INTEGRATIONS.map(int => (
+          <div key={int.id} className="card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#1A1A1A] border border-[#2A2A2A] flex items-center justify-center flex-shrink-0">
+                  <Plug className="w-5 h-5 text-[#A1A1A1]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-[14px] font-semibold text-[#F5F5F5]">{int.name}</h3>
+                    {int.status === 'connected' ? (
+                      <CheckCircle2 className="w-4 h-4 text-success" />
+                    ) : (
+                      <span className="badge badge-inactive text-[10px]">Available</span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-[#6F6F6F]">{int.desc}</p>
+                  {int.url && (
+                    <div className="text-[11px] font-mono text-brand mt-1.5">{int.url}</div>
+                  )}
+                </div>
+              </div>
+              <a
+                href={int.docs}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary btn-xs flex-shrink-0"
+              >
+                Docs <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
