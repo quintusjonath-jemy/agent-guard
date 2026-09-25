@@ -41,3 +41,7 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 settings = Settings()
+
+def get_settings() -> Settings:
+    return settings
+
