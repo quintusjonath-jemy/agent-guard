@@ -1,24 +1,22 @@
-version: '3.8'
-
 services:
   mysql:
-    image: mysql:8.0
+    image: mariadb:10.11
     container_name: agentguard-mysql
     restart: unless-stopped
+    command: --innodb-use-native-aio=0
     environment:
       MYSQL_DATABASE: agentguard_db
       MYSQL_USER: agentguard_user
       MYSQL_PASSWORD: agentguard_secure_password
       MYSQL_ROOT_PASSWORD: root_secure_password
+      MARIADB_DATABASE: agentguard_db
+      MARIADB_USER: agentguard_user
+      MARIADB_PASSWORD: agentguard_secure_password
+      MARIADB_ROOT_PASSWORD: root_secure_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
     networks:
       - agentguard-network
 
@@ -30,11 +28,6 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
     networks:
       - agentguard-network
 
@@ -54,10 +47,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mysql
+      - redis
     networks:
       - agentguard-network
 
@@ -74,10 +65,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - JWT_SECRET=super-secret-agentguard-jwt-key-change-in-production-min-32-chars-long
     depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - mysql
+      - redis
     networks:
       - agentguard-network
 
