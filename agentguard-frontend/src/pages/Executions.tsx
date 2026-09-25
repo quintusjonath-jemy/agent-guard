@@ -13,7 +13,11 @@ export const Executions: React.FC = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['executions', decision],
-    queryFn: () => apiClient.get(`/executions${decision ? `?decision=${decision}` : ''}&limit=100`).then(r => r.data.data),
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '100' });
+      if (decision) params.append('decision', decision);
+      return apiClient.get(`/executions?${params.toString()}`).then(r => r.data.data);
+    },
     refetchInterval: 10000,
   });
 

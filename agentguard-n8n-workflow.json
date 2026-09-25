@@ -5,13 +5,18 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "agent-webhook",
+        "responseMode": "responseNode",
         "options": {}
       },
       "id": "1",
+      "webhookId": "cfa0d5b2-111c-46a2-97a4-f8eb84c0fb1a",
       "name": "Incoming Agent Request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -34,20 +39,23 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ agent_id: ($json.body && $json.body.agent_id) ? $json.body.agent_id : ($json.agent_id || 2), tool: ($json.body && $json.body.tool_name) ? $json.body.tool_name : ($json.tool_name || $json.tool || 'customer.read'), action: ($json.body && $json.body.action_name) ? $json.body.action_name : ($json.action_name || $json.action || 'read'), payload: ($json.body && $json.body.payload) ? $json.body.payload : ($json.payload || {}) }) }}"
+        "jsonBody": "={{ JSON.stringify({ agent_id: ($json.body && $json.body.agent_id) ? $json.body.agent_id : ($json.agent_id || 2), tool: ($json.body && ($json.body.tool || $json.body.tool_name)) ? ($json.body.tool || $json.body.tool_name) : ($json.tool || $json.tool_name || 'customer.read'), action: ($json.body && ($json.body.action || $json.body.action_name)) ? ($json.body.action || $json.body.action_name) : ($json.action || $json.action_name || 'read'), payload: ($json.body && $json.body.payload) ? $json.body.payload : ($json.payload || {}) }) }}"
       },
       "id": "2",
       "name": "AgentGuard Security Firewall",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.data.decision }}",
+              "value1": "={{ $json.data ? $json.data.decision : $json.decision }}",
               "value2": "ALLOWED"
             }
           ]
@@ -57,23 +65,29 @@
       "name": "Evaluate Guard Decision",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, decision: $json.data.decision, tool_response: $json.data.response_payload, execution_id: $json.data.execution_id } }}"
+        "responseBody": "={{ { success: true, decision: ($json.data ? $json.data.decision : $json.decision), tool_response: ($json.data ? $json.data.response_payload : $json.response_payload), execution_id: ($json.data ? $json.data.execution_id : $json.execution_id) } }}"
       },
       "id": "4",
       "name": "Proceed With Action Result",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 200]
+      "position": [
+        960,
+        200
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: false, decision: $json.data.decision, risk_score: $json.data.risk_score, reason: $json.data.reason } }}",
+        "responseBody": "={{ { success: false, decision: ($json.data ? $json.data.decision : $json.decision), risk_score: ($json.data ? $json.data.risk_score : $json.risk_score), reason: ($json.data ? $json.data.reason : $json.reason) } }}",
         "options": {
           "responseCode": 403
         }
@@ -82,7 +96,10 @@
       "name": "Block Unsafe Agent Action",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [960, 420]
+      "position": [
+        960,
+        420
+      ]
     }
   ],
   "connections": {
@@ -126,5 +143,6 @@
         ]
       ]
     }
-  }
+  },
+  "id": "QoV318mQKRot4jyb"
 }

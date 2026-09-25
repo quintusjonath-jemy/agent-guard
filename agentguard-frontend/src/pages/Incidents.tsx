@@ -11,12 +11,17 @@ export const Incidents: React.FC = () => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['incidents', status],
-    queryFn: () => apiClient.get(`/incidents${status ? `?status=${status}` : ''}&limit=100`).then(r => r.data.data),
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (status) params.append('status_filter', status);
+      const q = params.toString();
+      return apiClient.get(`/incidents${q ? `?${q}` : ''}`).then(r => r.data.data);
+    },
     refetchInterval: 15000,
   });
 
   const resolve = useMutation({
-    mutationFn: (id: number) => apiClient.patch(`/incidents/${id}`, { status: 'RESOLVED' }),
+    mutationFn: (id: number) => apiClient.put(`/incidents/${id}`, { status: 'RESOLVED' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['incidents'] }),
   });
 
