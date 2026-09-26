@@ -23,6 +23,16 @@ class SensitiveDataService:
             RiskLevel.CRITICAL,
             "Raw OpenAI API Secret Key detected"
         ),
+        "AWS_ACCESS_KEY": (
+            re.compile(r"\b(AKIA[0-9A-Z]{16})\b"),
+            RiskLevel.CRITICAL,
+            "Raw AWS Access Key ID detected"
+        ),
+        "AWS_ACCESS_KEY": (
+            re.compile(r"\b(AKIA[0-9A-Z]{16})\b"),
+            RiskLevel.CRITICAL,
+            "Raw AWS Access Key ID detected"
+        ),
         "GENERIC_API_KEY": (
             re.compile(r"\b(?:api[_-]?key|secret[_-]?key|access[_-]?token|auth[_-]?token)[\s:=]+['\"]?([a-zA-Z0-9_\-\.]{20,})['\"]?", re.IGNORECASE),
             RiskLevel.CRITICAL,

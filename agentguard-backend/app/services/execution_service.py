@@ -209,7 +209,7 @@ class ExecutionService:
         response_payload = None
         execution_status = "COMPLETED"
         if final_decision == ExecutionDecision.ALLOWED:
-            mock_res = mock_tool_service.execute_tool(tool.name, request.action, request.payload)
+            mock_res = mock_tool_service.execute_tool(tool.name, request.action, sanitized_payload)
             response_payload = mock_res.model_dump()
         elif final_decision == ExecutionDecision.PENDING_APPROVAL:
             execution_status = "PENDING_APPROVAL"
