@@ -40,6 +40,7 @@ class SecurityTestHistoryItem(BaseModel):
     agent_name: str
     scenario_name: str
     category: str
+    input_data: Optional[Dict[str, Any]] = None
     expected_result: str
     actual_result: str
     passed: bool
