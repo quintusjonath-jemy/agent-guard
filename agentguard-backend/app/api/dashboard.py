@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,6 +8,8 @@ from app.models.agent import Agent
 from app.models.execution import Execution
 from app.models.approval import Approval
 from app.models.incident import Incident
+from app.models.policy import Policy
+from app.models.tool import Tool
 from app.models.user import User
 from app.core.permissions import ExecutionDecision, ApprovalStatus, IncidentStatus, AgentStatus, RiskLevel
 from app.schemas.incident import (
@@ -31,6 +33,10 @@ def get_dashboard_stats(
     start_of_today = datetime(now.year, now.month, now.day)
 
     active_agents = db.query(Agent).filter(Agent.status == AgentStatus.ACTIVE).count()
+    total_agents = db.query(Agent).count()
+    active_policies = db.query(Policy).filter(Policy.enabled == True).count()
+    active_tools = db.query(Tool).filter(Tool.enabled == True).count()
+
     actions_today = db.query(Execution).filter(Execution.created_at >= start_of_today).count()
     blocked_today = db.query(Execution).filter(
         Execution.created_at >= start_of_today,
@@ -39,6 +45,19 @@ def get_dashboard_stats(
 
     pending_approvals = db.query(Approval).filter(Approval.status == ApprovalStatus.PENDING).count()
     open_incidents = db.query(Incident).filter(Incident.status != IncidentStatus.RESOLVED).count()
+
+    # Calculate risk distribution
+    low_cnt = db.query(Execution).filter(Execution.risk_level == RiskLevel.LOW).count()
+    med_cnt = db.query(Execution).filter(Execution.risk_level == RiskLevel.MEDIUM).count()
+    high_cnt = db.query(Execution).filter(Execution.risk_level == RiskLevel.HIGH).count()
+    crit_cnt = db.query(Execution).filter(Execution.risk_level == RiskLevel.CRITICAL).count()
+    risk_dist = RiskDistributionResponse(
+        low=low_cnt,
+        medium=med_cnt,
+        high=high_cnt,
+        critical=crit_cnt,
+        total=low_cnt + med_cnt + high_cnt + crit_cnt
+    )
 
     # Calculate system security health score (0-100)
     total_actions = db.query(Execution).count()
@@ -60,12 +79,17 @@ def get_dashboard_stats(
         success=True,
         data=DashboardStatsResponse(
             active_agents=active_agents,
+            total_agents=total_agents,
+            active_policies=active_policies,
+            active_tools=active_tools,
             actions_today=actions_today,
+            executions_today=actions_today,
             blocked_today=blocked_today,
             pending_approvals=pending_approvals,
             open_incidents=open_incidents,
             security_score=security_score,
             system_status=system_status,
+            risk_distribution=risk_dist,
             timestamp=now
         )
     )
@@ -73,13 +97,15 @@ def get_dashboard_stats(
 @router.get("/security-trends", response_model=ApiResponse[List[SecurityTrendPoint]])
 def get_security_trends(
     range_view: str = Query("24H", regex="^(24H|7D|30D)$"),
+    range: Optional[str] = Query(None, regex="^(24H|7D|30D)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    selected_range = range or range_view
     now = datetime.utcnow()
     points: List[SecurityTrendPoint] = []
 
-    if range_view == "24H":
+    if selected_range == "24H":
         # Hourly breakdown for last 12 intervals
         for i in range(11, -1, -1):
             interval_time = now - timedelta(hours=i * 2)
@@ -95,7 +121,7 @@ def get_security_trends(
             
             points.append(SecurityTrendPoint(timestamp=label, allowed=allowed, blocked=blocked, pending=pending))
 
-    elif range_view == "7D":
+    elif selected_range == "7D":
         for i in range(6, -1, -1):
             day_time = now - timedelta(days=i)
             label = day_time.strftime("%a")
