@@ -94,7 +94,7 @@ const PRESET_SCENARIOS: PresetScenario[] = [
   },
   {
     id: 'dlp_leak',
-    name: '4. Secret Leakage (DLP Scan)',
+    name: '4. Secret Leakage (DLP Intercept)',
     tag: 'Credential Redaction',
     agentId: 2,
     agentName: 'SupportBot',
@@ -103,10 +103,10 @@ const PRESET_SCENARIOS: PresetScenario[] = [
     thought: 'Customer pasted AWS credentials in support chat. Creating internal ticket.',
     payload: {
       title: 'Database connection failed',
-      description: 'Using AWS key AKIAIOSFODNN7EXAMPLE and secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+      description: 'Using AWS key AKIAIOSFODNN7EXAMPLE for verification'
     },
-    expectedDecision: 'ALLOWED',
-    badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
+    expectedDecision: 'BLOCKED',
+    badgeColor: 'text-rose-400 bg-rose-500/10 border-rose-500/20',
   },
   {
     id: 'unauthorized_tool',
@@ -208,7 +208,11 @@ export const Integrations: React.FC = () => {
   });
 
   const agents: AgentOption[] = agentsData?.length > 0
-    ? agentsData
+    ? agentsData.map((ag: any) => ({
+        id: ag.id,
+        name: ag.name,
+        role: ag.description || ag.role || ag.provider || 'AI Agent'
+      }))
     : [
         { id: 1, name: 'FinanceBot', role: 'Autonomous Finance Operator' },
         { id: 2, name: 'SupportBot', role: 'Customer Service Specialist' },
