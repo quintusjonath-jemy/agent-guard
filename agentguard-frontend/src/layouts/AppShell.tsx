@@ -9,6 +9,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { CommandPalette } from '../components/CommandPalette';
+import { useQuery } from '@tanstack/react-query';
+import apiClient from '../api/client';
 
 interface NavItem {
   path: string;
@@ -77,12 +79,35 @@ export const AppShell: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [notifications, setNotifications] = useState(0);
+  const [liveToast, setLiveToast] = useState<{
+    id: number;
+    title: string;
+    description: string;
+    path: string;
+    type: string;
+  } | null>(null);
 
-  // Track new events as notifications
+  // Fetch pending approvals count for live badge
+  const { data: pendingApprovals } = useQuery({
+    queryKey: ['approvals_pending_count'],
+    queryFn: () => apiClient.get('/approvals?status_filter=PENDING&limit=100').then(r => r.data.data),
+    refetchInterval: 5000,
+  });
+  const pendingApprovalsCount = Array.isArray(pendingApprovals) ? pendingApprovals.length : 0;
+
+  // Track new events as notifications and live toast alerts
   useEffect(() => {
     if (liveEvents.length > 0) {
       const last = liveEvents[0];
-      if (last.data.decision === 'BLOCKED' || last.data.decision === 'FAILED') {
+      if (last.type === 'APPROVAL_REQUESTED') {
+        setLiveToast({
+          id: last.data.approval_id || Date.now(),
+          title: `Action Requires Approval: ${last.data.agent_name || 'AI Agent'}`,
+          description: `${last.data.action_name || 'Action'} · ${last.data.reason || 'Exceeds safety limit.'}`,
+          path: '/approvals',
+          type: 'APPROVAL',
+        });
+      } else if (last.data.decision === 'BLOCKED' || last.data.decision === 'FAILED') {
         setNotifications(n => Math.min(n + 1, 99));
       }
     }
@@ -148,8 +173,13 @@ export const AppShell: React.FC = () => {
                   {!compact && item.live && (
                     <span className={`live-dot ${isConnected ? '' : 'gray'}`} />
                   )}
-                  {!compact && item.badge && notifications > 0 && (
-                    <span className="text-[10px] font-mono font-bold bg-[#F04444] text-white rounded-full w-4 h-4 flex items-center justify-center">
+                  {!compact && item.path === '/approvals' && pendingApprovalsCount > 0 && (
+                    <span className="text-[10px] font-mono font-bold bg-[#EF4444] text-white rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center ml-auto">
+                      {pendingApprovalsCount > 9 ? '9+' : pendingApprovalsCount}
+                    </span>
+                  )}
+                  {!compact && item.badge && item.path !== '/approvals' && notifications > 0 && (
+                    <span className="text-[10px] font-mono font-bold bg-[#F04444] text-white rounded-full w-4 h-4 flex items-center justify-center ml-auto">
                       {notifications > 9 ? '9+' : notifications}
                     </span>
                   )}
@@ -284,6 +314,48 @@ export const AppShell: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* ── Real-Time Live Security Alert Toast ────────── */}
+      {liveToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full p-4 rounded-xl bg-[#141414] border border-[#F59E0B]/50 shadow-2xl shadow-amber-950/20 animate-slide-up flex items-start gap-3">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0 mt-0.5">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-400">
+                Action Requires Approval
+              </span>
+              <button
+                onClick={() => setLiveToast(null)}
+                className="text-[#666] hover:text-[#CCC] p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <p className="text-[13px] font-semibold text-[#F5F5F5] truncate mt-0.5">{liveToast.title}</p>
+            <p className="text-[11px] text-[#888] truncate-2 mt-0.5 leading-snug">{liveToast.description}</p>
+            <div className="mt-2.5 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setLiveToast(null);
+                  navigate('/approvals');
+                }}
+                className="btn-primary btn-xs flex items-center gap-1 text-[11px]"
+              >
+                <span>Review In Approvals</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => setLiveToast(null)}
+                className="btn-ghost btn-xs text-[11px] text-[#777]"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
