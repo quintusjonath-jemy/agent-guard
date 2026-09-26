@@ -66,6 +66,10 @@ class AgentGuardToolWrapper:
                 return json.loads(body)
             except Exception:
                 return {"success": False, "error": f"HTTP {e.code}: {e.reason}", "body": body}
+        except urllib.error.URLError as e:
+            return {"success": False, "error": f"Failed to connect to gateway at {self.gateway_url}: {e.reason}"}
+        except Exception as e:
+            return {"success": False, "error": f"Unexpected client error: {str(e)}"}
 
     def __call__(self, action: str = "execute", **kwargs):
         return self.run(action=action, **kwargs)
