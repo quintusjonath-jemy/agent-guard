@@ -119,6 +119,7 @@ app.include_router(ws_router)
 
 # Base Health Check Route
 @app.get("/health", response_model=ApiResponse[HealthCheckResponse], tags=["System"])
+@app.get(f"{settings.API_PREFIX}/health", response_model=ApiResponse[HealthCheckResponse], tags=["System"])
 async def health_check():
     return ApiResponse(
         success=True,
