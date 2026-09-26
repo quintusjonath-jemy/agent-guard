@@ -26,8 +26,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
 
     # Integrations
-    OPENAI_API_KEY: str = ""
-    N8N_WEBHOOK_URL: str = ""
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    N8N_WEBHOOK_URL: str = os.getenv("N8N_WEBHOOK_URL", "")
 
     # Logging
     LOG_LEVEL: str = "INFO"
