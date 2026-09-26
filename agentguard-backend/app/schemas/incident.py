@@ -44,14 +44,26 @@ class AuditLogResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RiskDistributionResponse(BaseModel):
+    low: int
+    medium: int
+    high: int
+    critical: int
+    total: int
+
 class DashboardStatsResponse(BaseModel):
     active_agents: int
+    total_agents: Optional[int] = 0
+    active_policies: Optional[int] = 0
+    active_tools: Optional[int] = 0
     actions_today: int
+    executions_today: Optional[int] = None
     blocked_today: int
     pending_approvals: int
     open_incidents: int
     security_score: int
     system_status: str
+    risk_distribution: Optional[RiskDistributionResponse] = None
     timestamp: datetime
 
 class SecurityTrendPoint(BaseModel):
@@ -59,13 +71,6 @@ class SecurityTrendPoint(BaseModel):
     allowed: int
     blocked: int
     pending: int
-
-class RiskDistributionResponse(BaseModel):
-    low: int
-    medium: int
-    high: int
-    critical: int
-    total: int
 
 class RiskyAgentLeaderboardItem(BaseModel):
     agent_id: int

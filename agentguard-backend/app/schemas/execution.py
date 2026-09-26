@@ -67,6 +67,7 @@ class ExecutionListItem(BaseModel):
 
 class ExecutionDetailResponse(BaseModel):
     id: int
+    execution_id: Optional[int] = None
     agent_id: int
     agent_name: str
     provider: str

@@ -123,6 +123,7 @@ def get_execution_detail(
         success=True,
         data=ExecutionDetailResponse(
             id=execution.id,
+            execution_id=execution.id,
             agent_id=execution.agent_id,
             agent_name=agent_name,
             provider=execution.agent.provider if execution.agent else "Unknown Provider",

@@ -86,7 +86,7 @@ export const Dashboard: React.FC = () => {
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
-  const chartData = trends?.chart || [];
+  const chartData = Array.isArray(trends) ? trends : (trends?.chart || []);
   const riskDist  = stats?.risk_distribution || { low: 0, medium: 0, high: 0, critical: 0 };
   const riskPie   = [
     { name: 'Low', value: riskDist.low || 0 },
@@ -152,7 +152,7 @@ export const Dashboard: React.FC = () => {
         {/* Metrics */}
         <div className="md:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard label="Active Agents" value={stats?.active_agents ?? '—'} sub="In production"       icon={Bot}         accent="green"  trend="+2 today"   trendUp />
-          <MetricCard label="Actions Today" value={stats?.executions_today ?? '—'} sub="Gateway requests" icon={Zap}         accent="default" />
+          <MetricCard label="Actions Today" value={stats?.actions_today ?? stats?.executions_today ?? '—'} sub="Gateway requests" icon={Zap}         accent="default" />
           <MetricCard label="Blocked Actions" value={stats?.blocked_today ?? '—'}  sub="Policy violations" icon={ShieldAlert} accent="red"    trend={stats?.blocked_today > 0 ? `${stats.blocked_today} blocked` : undefined} trendUp={false} />
           <MetricCard label="Pending Approvals" value={stats?.pending_approvals ?? '—'} sub={stats?.pending_approvals > 0 ? 'Requires attention' : 'No actions required'} icon={CheckCircle2} accent={stats?.pending_approvals > 0 ? 'yellow' : 'green'} />
         </div>

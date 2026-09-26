@@ -69,7 +69,7 @@ export const ExecutionInspector: React.FC = () => {
       <div className="card p-6 mb-5">
         <div className="flex items-start justify-between flex-wrap gap-4">
           <div>
-            <div className="text-[11px] font-mono text-[#6F6F6F] mb-1">EXECUTION #{ex.execution_id}</div>
+            <div className="text-[11px] font-mono text-[#6F6F6F] mb-1">EXECUTION #{ex.id ?? ex.execution_id}</div>
             <h1 className="text-[22px] font-semibold text-[#F5F5F5] tracking-tight">{ex.agent_name}</h1>
             <div className="text-[13px] font-mono text-[#A1A1A1] mt-1">{ex.tool_name} · {ex.action_name}</div>
           </div>
@@ -89,10 +89,10 @@ export const ExecutionInspector: React.FC = () => {
         </div>
 
         {/* Plain-English explanation */}
-        {ex.reason && (
-          <div className={`mt-5 pt-4 border-t border-[#2A2A2A]`}>
-            <div className="text-[11px] text-[#6F6F6F] mb-1.5 uppercase tracking-wide font-semibold">Decision Reason</div>
-            <p className="text-[13px] text-[#A1A1A1] leading-relaxed">{ex.reason}</p>
+        {(ex.plain_english_explanation || ex.reason) && (
+          <div className="mt-5 pt-4 border-t border-[#2A2A2A]">
+            <div className="text-[11px] text-[#6F6F6F] mb-1.5 uppercase tracking-wide font-semibold">Decision Explanation</div>
+            <p className="text-[13px] text-[#A1A1A1] leading-relaxed">{ex.plain_english_explanation || ex.reason}</p>
           </div>
         )}
       </div>

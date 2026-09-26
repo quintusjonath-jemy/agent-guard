@@ -119,15 +119,27 @@ app.include_router(ws_router)
 
 # Base Health Check Route
 @app.get("/health", response_model=ApiResponse[HealthCheckResponse], tags=["System"])
+@app.get(f"{settings.API_PREFIX}/health", response_model=ApiResponse[HealthCheckResponse], tags=["System"])
 async def health_check():
+    db_status = "connected"
+    system_status = "healthy"
+    try:
+        from app.database.connection import SessionLocal
+        from sqlalchemy import text
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "disconnected"
+        system_status = "degraded"
+
     return ApiResponse(
-        success=True,
+        success=(system_status == "healthy"),
         data=HealthCheckResponse(
-            status="healthy",
+            status=system_status,
             app_name=settings.APP_NAME,
             version="1.0.0",
             environment=settings.APP_ENV,
-            database="connected",
+            database=db_status,
             timestamp=datetime.utcnow().isoformat()
         )
     )
