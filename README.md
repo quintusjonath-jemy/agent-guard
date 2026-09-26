@@ -259,10 +259,40 @@ agentGuard/
 │   │   └── types/              # TypeScript Types
 │   ├── Dockerfile
 │   └── package.json
-├── agentguard-n8n-workflow.json# Sample n8n Webhook Integration
+├── agentguard-n8n-workflow.json# Production-ready n8n Webhook Workflow
+├── docs/
+│   └── N8N_INTEGRATION.md      # Comprehensive n8n Integration Guide
+├── examples/
+│   ├── ai_agent_client.py      # Standalone Python AI Agent Client
+│   ├── langchain_agent.py      # LangChain Custom Tool Wrapper
+│   └── n8n_agent_workflow.py   # Turnkey n8n Webhook Demonstration
 ├── docker-compose.yml          # Multi-container orchestration
 └── README.md                   # Project Documentation
 ```
+
+---
+
+## 🔌 n8n Autonomous Workflow Automation
+
+AgentGuard provides a native, turnkey integration with **n8n** for low-code AI agent orchestration:
+
+1. **Workflow Blueprint**: [`agentguard-n8n-workflow.json`](./agentguard-n8n-workflow.json)
+2. **Comprehensive Guide**: Read the [n8n Integration Guide](docs/N8N_INTEGRATION.md) for architecture, node breakdown, and Docker configuration.
+3. **Turnkey Test Script**:
+   ```bash
+   python examples/n8n_agent_workflow.py
+   ```
+4. **Direct Webhook Execution**:
+   ```bash
+   curl -i -X POST http://localhost:5678/webhook/agent-webhook \
+     -H "Content-Type: application/json" \
+     -d '{
+       "agent_id": 2,
+       "tool": "customer.read",
+       "action": "read",
+       "payload": {"customer_id": "cust_101"}
+     }'
+   ```
 
 ---
 
