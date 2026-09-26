@@ -87,7 +87,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: false, decision: ($json.data ? $json.data.decision : $json.decision), risk_score: ($json.data ? $json.data.risk_score : $json.risk_score), reason: ($json.data ? $json.data.reason : $json.reason) } }}",
+        "responseBody": "={{ { success: false, decision: ($json.data ? $json.data.decision : $json.decision), risk_score: ($json.data ? $json.data.risk_score : $json.risk_score), reason: ($json.data ? $json.data.reason : $json.reason), execution_id: ($json.data ? $json.data.execution_id : $json.execution_id) } }}",
         "options": {
           "responseCode": 403
         }

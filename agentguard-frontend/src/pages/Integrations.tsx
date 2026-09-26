@@ -180,7 +180,7 @@ const CONNECTORS = [
 
 export const Integrations: React.FC = () => {
   const [activeMainTab, setActiveMainTab] = useState<'sandbox' | 'sdks' | 'connectors'>('sandbox');
-  const [codeTab, setCodeTab] = useState<'python' | 'langchain' | 'crewai' | 'typescript' | 'curl'>('python');
+  const [codeTab, setCodeTab] = useState<'python' | 'langchain' | 'crewai' | 'typescript' | 'curl' | 'n8n'>('python');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -423,7 +423,29 @@ export async function executeAgentTool(agentId: number, tool: string, action: st
     "payload": {
       "customer_id": "cust_101"
     }
-  }'`
+  }'`,
+
+    n8n: `// Trigger n8n Protected Autonomous Agent Webhook
+// POST http://localhost:5678/webhook/agent-webhook
+
+curl -X POST http://localhost:5678/webhook/agent-webhook \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "agent_id": 2,
+    "tool": "customer.read",
+    "action": "read",
+    "payload": {
+      "customer_id": "cust_101"
+    }
+  }'
+
+// Autonomous Workflow Pipeline:
+// 1. n8n Webhook (/webhook/agent-webhook) receives tool call request
+// 2. n8n HTTP Request node queries AgentGuard (http://backend:8000/api/v1/execute)
+// 3. AgentGuard evaluates RBAC, DLP, and risk thresholds
+// 4. n8n branches:
+//    - ALLOWED: returns 200 OK with sanitized tool execution output
+//    - BLOCKED: returns 403 Forbidden with security policy violation details`
   };
 
   const getDecisionBadge = (decision?: string) => {
@@ -883,6 +905,7 @@ export async function executeAgentTool(agentId: number, tool: string, action: st
               { id: 'langchain', label: 'LangChain Tool' },
               { id: 'crewai', label: 'CrewAI Tool' },
               { id: 'typescript', label: 'TypeScript / Node' },
+              { id: 'n8n', label: 'n8n Webhook' },
               { id: 'curl', label: 'cURL' },
             ].map((tab) => (
               <button
