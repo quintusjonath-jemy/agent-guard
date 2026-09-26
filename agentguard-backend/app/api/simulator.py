@@ -70,6 +70,7 @@ def list_security_test_history(
                 agent_name=t.agent.name if t.agent else "Unknown Agent",
                 scenario_name=t.scenario_name,
                 category=t.category,
+                input_data=t.input_data,
                 expected_result=t.expected_result,
                 actual_result=t.actual_result,
                 passed=t.passed,
