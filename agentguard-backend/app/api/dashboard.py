@@ -97,11 +97,11 @@ def get_dashboard_stats(
 @router.get("/security-trends", response_model=ApiResponse[List[SecurityTrendPoint]])
 def get_security_trends(
     range_view: str = Query("24H", regex="^(24H|7D|30D)$"),
-    range: Optional[str] = Query(None, regex="^(24H|7D|30D)$"),
+    range_filter: Optional[str] = Query(None, alias="range", regex="^(24H|7D|30D)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    selected_range = range or range_view
+    selected_range = range_filter or range_view
     now = datetime.utcnow()
     points: List[SecurityTrendPoint] = []
 
