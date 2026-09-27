@@ -1,11 +1,12 @@
 # AgentGuard 🛡️
 > **The Deterministic Security Firewall for Autonomous AI Agents.**
 
-[![CI Test Suite: 36/36 Passing](https://img.shields.io/badge/tests-36%20passed-brightgreen.svg)]()
+[![CI Test Suite: 43/43 Passing](https://img.shields.io/badge/tests-43%20passed-brightgreen.svg)]()
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-009688.svg)]()
 [![React 18](https://img.shields.io/badge/React-18-61DAFB.svg)]()
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg)]()
+[![Celery + Redis](https://img.shields.io/badge/Celery-Redis%20Workers-FF6B6B.svg)]()
 [![Docker Compose](https://img.shields.io/badge/docker--compose-ready-2496ED.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)]()
 
@@ -56,6 +57,7 @@ AgentGuard operates as an inline, deterministic proxy firewall between AI agents
                           ┌───────────────────────────────────────┐
                           │ Real-Time Live Monitor (WebSockets)   │
                           │ Immutable Tamper-Evident Audit Trail  │
+                          │ Celery Workers & Redis Task Broker    │
                           └───────────────────────────────────────┘
 ```
 
@@ -67,6 +69,29 @@ For full architecture specifications, see [docs/ARCHITECTURE.md](docs/ARCHITECTU
 
 - **🛡️ Deterministic Action Firewall**: Sub-15ms inline interception (`POST /api/v1/execute`) with step-by-step pipeline audit trails and plain-English risk explanations.
 - **🔒 Data Loss Prevention (DLP)**: Automated regex detection and masking for AWS access keys, OpenAI API secrets, JWT tokens, credit card numbers (PCI-DSS), phone numbers, and emails.
+- **📜 Dynamic Policy Engine**: Visual rule configuration for financial transaction limits, destructive operation blocking, and tool access control.
+- **👤 Human-in-the-Loop (HITL) Center**: Real-time review queue for high-risk actions exceeding policy thresholds with Supervisor approve/reject actions that resume or cancel executions.
+- **🚨 SOC Incident Management**: Automatic incident ticket generation for critical security events (prompt injection jailbreaks, credential leakage, privilege escalation) with investigation workflows.
+- **⚙️ Celery Background Workers**: Dedicated asynchronous task pipeline for red team attack scans, SLA timeout sweeps, SOC report generation, and audit trail exports via Redis.
+- **📊 Turnkey Demo Telemetry Seeder**: One-click or CLI population of 15+ multi-agent executions, 3 approvals, 4 security incidents, and realistic timestamped audit trails.
+- **🧪 Red Team Attack Lab**: Built-in 10-scenario automated security test simulator with instant remediation advice:
+  1. Unauthorized Data Exfiltration
+  2. Financial Limit Bypass
+  3. Dangerous Delete Operation
+  4. System Prompt Injection
+  5. Credential & API Key Leakage
+  6. Unregistered Tool Hijack
+  7. Mass Email Phishing
+  8. Disabled Agent Rogue Execution
+  9. Rate Limit Flooding
+  10. PII Exposure Attempt
+- **📡 Real-Time Live Monitor**: Interactive WebSocket feed showing live agent tool invocations, decisions, risk distributions, and system health.
+- **🔑 Developer API Keys**: SHA-256 hashed API keys with prefix tracking (`ag_live_...`) for secure agent integration.
+- **🔌 Multi-Orchestrator Connectors**: Drop-in client wrappers for **n8n**, **LangChain**, **CrewAI**, **AutoGen**, and native **Python / TypeScript**.
+
+---
+
+## 🔐 Default Demo CredentialsCI-DSS), phone numbers, and emails.
 - **📜 Dynamic Policy Engine**: Visual rule configuration for financial transaction limits, destructive operation blocking, and tool access control.
 - **👤 Human-in-the-Loop (HITL) Center**: Real-time review queue for high-risk actions exceeding policy thresholds with Supervisor approve/reject actions that resume or cancel executions.
 - **🚨 SOC Incident Management**: Automatic incident ticket generation for critical security events (prompt injection jailbreaks, credential leakage, privilege escalation) with investigation workflows.
@@ -153,7 +178,7 @@ npm run dev
 
 ## 🧪 Automated Testing
 
-AgentGuard includes a comprehensive test suite of **36 automated unit and integration tests** covering the entire security pipeline:
+AgentGuard includes a comprehensive test suite of **43 automated unit and integration tests** across 8 test suites, ensuring 100% passing coverage over the entire security pipeline:
 
 ```bash
 # Run inside Docker container
@@ -164,12 +189,56 @@ python -m pytest tests/ -v
 ```
 
 ### Test Coverage Highlights:
-- `test_auth.py`: Authentication, JWT issuance, rate-limiting, and RBAC profiles.
+- `test_auth.py`: Authentication, JWT issuance, password hashing, login rate-limiting, and RBAC profiles.
 - `test_gateway_and_approvals.py`: Decision routing, API key auth, execution inspector, and supervisor resolution.
 - `test_security_engines.py`: DLP regex scanning, permission limits, policy engine, and risk scoring.
-- `test_ai_agent_integration.py`: Section 22 agent policies, Section 45/46 prompt injection defenses.
+- `test_ai_agent_integration.py`: SupportBot, FinanceBot, DevOpsAgent policies, and prompt injection defenses.
 - `test_n8n_integration.py`: n8n workflow schema, webhook execution contracts, and gateway integration.
 - `test_incidents_audit_and_simulator.py`: SOC incident lifecycle, audit trail immutability, and 10-scenario red team simulator.
+- `test_users_and_keys.py`: User administration, developer API key issuance, and SHA-256 key revocation.
+- `test_phase9_background_and_seeders.py`: Celery background tasks, Redis message queue dispatch, and demo telemetry seeding.
+
+---
+
+## ⚙️ Background Processing & Celery Workers
+
+To maintain sub-15ms inline gateway latency without blocking incoming agent requests, heavy and asynchronous operations run on dedicated **Celery** workers backed by **Redis**:
+
+| Task Name | Function | Description |
+|---|---|---|
+| **`run_async_security_scan`** | `app.workers.tasks.run_async_security_scan` | Dispatches the 10-scenario red team attack lab across agents in the background. |
+| **`expire_stale_approvals`** | `app.workers.tasks.expire_stale_approvals` | Automatically expires pending approvals that exceeded the SLA review timeout. |
+| **`generate_soc_summary`** | `app.workers.tasks.generate_soc_summary` | Generates executive risk distribution summaries and incident metrics. |
+| **`export_audit_report`** | `app.workers.tasks.export_audit_report` | Compiles a tamper-evident JSON audit trail export over a specified time window. |
+
+### Celery Worker CLI Management:
+```bash
+# Check worker status inside container
+docker exec agentguard-worker celery -A app.workers.tasks.celery_app status
+
+# Inspect running tasks
+docker exec agentguard-worker celery -A app.workers.tasks.celery_app inspect active
+```
+
+---
+
+## 📊 Demo Telemetry Seeder & System APIs
+
+AgentGuard features a deterministic demo data seeder designed for live executive demonstrations and SOC analyst onboarding:
+
+### CLI Demo Seeder:
+```bash
+# Run seeder inside Docker backend
+docker exec agentguard-backend python -m app.database.seed_demo_data
+```
+
+### System Administration REST Endpoints (`/api/v1/system`):
+- `POST /api/v1/system/seed-demo`: Seeds 15+ multi-agent executions, 3 approvals, 4 security incidents, and audit trails.
+- `POST /api/v1/system/tasks/security-scan`: Asynchronously triggers a 10-scenario red team security scan.
+- `POST /api/v1/system/tasks/expire-approvals`: Triggers the SLA auto-expiration sweeper.
+- `POST /api/v1/system/tasks/soc-summary`: Asynchronously computes the latest SOC security summary.
+- `POST /api/v1/system/tasks/export-audit`: Dispatches a background audit trail report generation job.
+- `GET /api/v1/system/tasks/{task_id}`: Polls Celery task execution status (`PENDING`, `STARTED`, `SUCCESS`, `FAILURE`).
 
 ---
 
@@ -240,14 +309,14 @@ AgentGuard includes native, out-of-the-box support for low-code agent orchestrat
 agentGuard/
 ├── agentguard-backend/         # FastAPI Backend Core
 │   ├── app/
-│   │   ├── api/                # REST Routers (auth, agents, tools, policies, executions, approvals, etc.)
+│   │   ├── api/                # REST Routers (auth, agents, tools, policies, executions, approvals, system, etc.)
 │   │   ├── core/               # Security, JWT, Bcrypt, Config, Logging, WebSockets
-│   │   ├── database/           # Models, SQLAlchemy connection, init_db seed scripts
+│   │   ├── database/           # Models, SQLAlchemy connection, seed_demo_data, init_db scripts
 │   │   ├── models/             # 12 Relational Entity Models
 │   │   ├── schemas/            # Pydantic Request & Response Schemas
 │   │   ├── services/           # 8 Core Security Engines & Services
-│   │   └── workers/            # Celery Asynchronous Worker Tasks
-│   ├── tests/                  # 36 Automated Pytest Unit & Integration Tests
+│   │   └── workers/            # Celery Asynchronous Worker Tasks (tasks.py)
+│   ├── tests/                  # 43 Automated Pytest Unit & Integration Tests (8 test suites)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── agentguard-frontend/        # React + TypeScript + Tailwind CSS SPA
@@ -257,14 +326,14 @@ agentGuard/
 │   │   ├── context/            # AuthContext (JWT session state)
 │   │   ├── hooks/              # WebSocket & Custom Query Hooks
 │   │   ├── layouts/            # AppShell (Collapsible Sidebar, Navigation)
-│   │   ├── pages/              # 16 High-Fidelity Pages (Dashboard, Approvals, Test Lab, etc.)
+│   │   ├── pages/              # 16 High-Fidelity Pages (Dashboard, Approvals, Settings, Test Lab, etc.)
 │   │   └── types/              # TypeScript Type Definitions
 │   ├── nginx.conf              # Reverse proxy & static SPA server configuration
 │   ├── Dockerfile
 │   └── package.json
 ├── agentguard-n8n-workflow.json# Production-ready n8n Autonomous Workflow Blueprint
 ├── docs/
-│   ├── ARCHITECTURE.md         # Technical architecture & pipeline specification
+│   ├── ARCHITECTURE.md         # Technical architecture & Celery pipeline specification
 │   └── N8N_INTEGRATION.md      # Comprehensive n8n Integration Guide
 ├── examples/
 │   ├── ai_agent_client.py      # Standalone Python AI Agent Client
