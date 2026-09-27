@@ -22,6 +22,7 @@ from app.api.incidents import router as incidents_router
 from app.api.audit_logs import router as audit_logs_router
 from app.api.dashboard import router as dashboard_router
 from app.api.simulator import router as simulator_router
+from app.api.system import router as system_router
 from app.api.ws import router as ws_router
 from app.api.deps import authenticate_caller
 from app.services.execution_service import execution_service
@@ -115,6 +116,7 @@ app.include_router(incidents_router, prefix=settings.API_PREFIX)
 app.include_router(audit_logs_router, prefix=settings.API_PREFIX)
 app.include_router(dashboard_router, prefix=settings.API_PREFIX)
 app.include_router(simulator_router, prefix=settings.API_PREFIX)
+app.include_router(system_router, prefix=settings.API_PREFIX)
 app.include_router(ws_router)
 
 # Base Health Check Route
