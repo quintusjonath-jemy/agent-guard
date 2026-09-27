@@ -143,3 +143,72 @@ AgentGuard utilizes 12 relational models managed via SQLAlchemy:
   │            └─────────────────────────────▲                   │
   └──────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## 6. Celery Asynchronous Processing & Background Tasks
+
+To maintain sub-15ms latency across the inline gateway (`POST /api/v1/execute`), resource-intensive operations and periodic background governance jobs are offloaded to dedicated Celery worker processes via Redis message queues.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Admin / Frontend / Cron
+    participant API as FastAPI Gateway
+    participant Redis as Redis Broker (Queue: celery)
+    participant Worker as Celery Worker Process
+    participant DB as MariaDB / MySQL
+
+    UI->>API: POST /api/v1/system/tasks/{action}
+    API->>Redis: enqueue task (celery_app.send_task)
+    API-->>UI: 202 Accepted {task_id, status: "PENDING"}
+    
+    Redis->>Worker: deliver task payload
+    Worker->>Worker: execute background job (prefork concurrency)
+    Worker->>DB: read/write state with isolated SessionLocal
+    Worker->>Redis: write task result & state (SUCCESS / FAILURE)
+    
+    UI->>API: GET /api/v1/system/tasks/{task_id}
+    API->>Redis: check AsyncResult(task_id)
+    API-->>UI: 200 OK {task_id, status: "SUCCESS", result: {...}}
+```
+
+### Core Asynchronous Tasks (`app/workers/tasks.py`):
+1. **`run_async_security_scan(agent_id=None)`**:
+   Dispatches the automated 10-scenario red team attack lab across registered agents. Simulates adversarial prompt injection, DLP bypass, and unauthorized tool calls asynchronously without impacting gateway ingress.
+2. **`expire_stale_approvals(timeout_minutes=60)`**:
+   SLA governance sweeper that locates pending human-in-the-loop approvals older than the threshold, marks them `EXPIRED`, and logs audit trail events.
+3. **`generate_soc_summary()`**:
+   Aggregates high-severity incidents, approval backlogs, agent risk distributions, and recent execution metrics for executive SOC briefings.
+4. **`export_audit_report(hours=24)`**:
+   Compiles an immutable snapshot of all audit log entries, gateway executions, and administrative interventions over the specified window.
+
+---
+
+## 7. System Administration & Demo Telemetry Engine
+
+To facilitate turnkey evaluation and live demonstrations without manual database population, AgentGuard includes a deterministic seeder engine (`app/database/seed_demo_data.py`).
+
+- **CLI Invocation**: `python -m app.database.seed_demo_data`
+- **REST Ingress**: `POST /api/v1/system/seed-demo` (Admin only)
+- **Synthetic Data Profile**:
+  - **15+ Realistic Gateway Executions**: Multi-agent tool calls (SupportBot, FinanceBot, DevOpsAgent, SalesAssistant) exhibiting `ALLOWED`, `PENDING_APPROVAL`, and `BLOCKED` outcomes.
+  - **3 HITL Approvals**: High-risk financial refunds, bulk database exports, and privilege escalations with mixed pending and resolved states.
+  - **4 Critical SOC Security Incidents**: Prompt injection jailbreaks, credential leakage, and unauthorized tool hijacks with realistic timestamps.
+  - **Audit Trail Entries**: Associated tamper-evident audit records across realistic multi-day time windows.
+
+---
+
+## 8. Production Hardening & Operational Readiness Checklist
+
+| Category | Security / Reliability Standard | AgentGuard Implementation |
+|---|---|---|
+| **Identity & Access** | SHA-256 key hashing & bcrypt password hashing | Passwords hashed with bcrypt (cost 12); API keys stored as SHA-256 digests (`ag_live_*`). |
+| **Session Security** | Stateless JWT tokens with strict expiration | HS256 JWTs with 8-hour access token expiration and role-based claim enforcement. |
+| **API Rate Limiting** | Prevent denial-of-service and brute force | Token-bucket rate limiting on `/api/v1/auth/login` (5 attempts/min) and agent endpoints. |
+| **Data Protection** | Regex Data Loss Prevention (DLP) | Inline scanning and redaction for AWS keys, OpenAI keys, JWTs, PCI-DSS cards, PII. |
+| **Network Isolation** | Isolated Docker bridge network | Containers communicate via internal `agentguard-network`; only ports 5173, 8000, 5678 exposed. |
+| **Database Reliability** | ACID transactional safety & connection pooling | SQLAlchemy engine with pool size 10, max overflow 20, and `pool_pre_ping=True`. |
+| **Process Separation** | Decoupled HTTP gateway and background workers | FastAPI handles async I/O; Celery handles CPU/heavy tasks via Redis broker. |
+| **Observability** | Real-time WebSocket streaming & health probes | `/health` & `/api/v1/health` probes checking DB connectivity; live WebSocket metrics stream. |
+
